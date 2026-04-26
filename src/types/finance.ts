@@ -151,3 +151,5 @@ export type ExportType =
   | "goals_csv"
   | "goal_contributions_csv"
   | "full_backup_json";
+
+export type ReminderSoundMode = "off" | "chime" | "meow";

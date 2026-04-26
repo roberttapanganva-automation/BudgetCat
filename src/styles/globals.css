@@ -3,15 +3,47 @@
 @tailwind utilities;
 
 :root {
-  --budget-background: #fff8ef;
+  --budget-background: #faf6f0;
   --budget-card: #ffffff;
-  --budget-primary: #7fa77b;
-  --budget-text: #2e2a24;
-  --budget-cat: #e6a44e;
-  --budget-success: #4f8f5b;
-  --budget-warning: #f2b84b;
-  --budget-urgent: #d96b5f;
-  --budget-border: #e8ded0;
+  --budget-primary: #2d7a52;
+  --budget-primary-dark: #1e5c3a;
+  --budget-primary-light: #4a9e6e;
+  --budget-text: #1c1a17;
+  --budget-text-secondary: #5c5648;
+  --budget-text-muted: #9a9184;
+  --budget-cat: #e8870a;
+  --budget-success: #2d7a52;
+  --budget-warning: #e8870a;
+  --budget-urgent: #c0392b;
+  --budget-border: rgba(92, 74, 58, 0.1);
+  --budget-cream-2: #f3ede4;
+  --budget-cream-3: #ebe3d7;
+  --budget-green-faint: #eaf5ef;
+  --budget-amber-pale: #fef3dc;
+  --budget-shadow: 0 1px 4px rgba(30, 25, 18, 0.07), 0 4px 16px rgba(30, 25, 18, 0.05);
+  --budget-sidebar-width: 220px;
+  --budget-radius: 14px;
+}
+
+[data-theme="dark"] {
+  --budget-background: #161411;
+  --budget-card: #242118;
+  --budget-primary: #48b275;
+  --budget-primary-dark: #5bc68a;
+  --budget-primary-light: #3d9966;
+  --budget-text: #f0ebe2;
+  --budget-text-secondary: #b8afa2;
+  --budget-text-muted: #756d62;
+  --budget-cat: #f5a030;
+  --budget-success: #5bc68a;
+  --budget-warning: #f5a030;
+  --budget-urgent: #f07070;
+  --budget-border: rgba(255, 255, 255, 0.07);
+  --budget-cream-2: #242118;
+  --budget-cream-3: #2d291e;
+  --budget-green-faint: #111f17;
+  --budget-amber-pale: #2e2210;
+  --budget-shadow: 0 1px 4px rgba(0, 0, 0, 0.3), 0 4px 16px rgba(0, 0, 0, 0.2);
 }
 
 * {
@@ -25,8 +57,11 @@ body {
   background: var(--budget-background);
   color: var(--budget-text);
   font-family:
-    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    "DM Sans", Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
     sans-serif;
+  transition:
+    background 0.2s ease,
+    color 0.2s ease;
 }
 
 button,
@@ -49,6 +84,36 @@ button {
 
 @layer components {
   .budget-input {
-    @apply w-full rounded-lg border border-budget-border bg-white px-4 py-3 text-sm text-budget-text outline-none transition placeholder:text-budget-text/40 focus:border-budget-primary focus:ring-4 focus:ring-budget-primary/15;
+    @apply w-full rounded-lg border px-4 py-3 text-sm outline-none transition;
+    border-color: var(--budget-border);
+    background: var(--budget-card);
+    color: var(--budget-text);
+  }
+
+  .budget-input::placeholder {
+    color: color-mix(in srgb, var(--budget-text) 40%, transparent);
+  }
+
+  .budget-input:focus {
+    border-color: var(--budget-primary);
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--budget-primary) 15%, transparent);
+  }
+
+  .budget-indeterminate-bar {
+    animation: budget-indeterminate 1.1s ease-in-out infinite;
+  }
+}
+
+@keyframes budget-indeterminate {
+  0% {
+    transform: translateX(-110%);
+  }
+
+  55% {
+    transform: translateX(45%);
+  }
+
+  100% {
+    transform: translateX(210%);
   }
 }

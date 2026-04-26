@@ -3,6 +3,7 @@ import { Plus } from "lucide-react";
 import { type FormEvent, useState } from "react";
 import { useAuth } from "../../contexts/AuthContext";
 import { addLocalTransaction } from "../../lib/localDb";
+import { getQuickAddPresets } from "../../lib/presets";
 import { syncPendingRecords } from "../../lib/syncEngine";
 import type { TransactionType } from "../../types/finance";
 import { Button } from "../ui/Button";
@@ -26,22 +27,34 @@ export function AddTransactionDialog({
   const { user } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const [type, setType] = useState<TransactionType>("expense");
+  const [amount, setAmount] = useState("");
+  const [category, setCategory] = useState("");
+  const [date, setDate] = useState(formatISO(new Date(), { representation: "date" }));
+  const [paymentMethod, setPaymentMethod] = useState("");
+  const [note, setNote] = useState("");
+  const presets = getQuickAddPresets();
+
+  function resetForm() {
+    setType("expense");
+    setAmount("");
+    setCategory("");
+    setDate(formatISO(new Date(), { representation: "date" }));
+    setPaymentMethod("");
+    setNote("");
+  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!user) return;
 
-    const formData = new FormData(event.currentTarget);
     await addLocalTransaction(
       {
         type,
-        amount: Number(formData.get("amount") || 0),
-        category: String(formData.get("category") || "Uncategorized"),
-        date: String(
-          formData.get("date") || formatISO(new Date(), { representation: "date" }),
-        ),
-        payment_method: String(formData.get("payment_method") || "Cash"),
-        note: String(formData.get("note") || ""),
+        amount: Number(amount || 0),
+        category: category || "Uncategorized",
+        date: date || formatISO(new Date(), { representation: "date" }),
+        payment_method: paymentMethod || "Cash",
+        note,
       },
       user.id,
       user.householdId,
@@ -52,8 +65,7 @@ export function AddTransactionDialog({
     }
 
     setIsOpen(false);
-    event.currentTarget.reset();
-    setType("expense");
+    resetForm();
   }
 
   return (
@@ -67,6 +79,30 @@ export function AddTransactionDialog({
         onClose={() => setIsOpen(false)}
         title="Add transaction"
       >
+        <div className="mb-5">
+          <p className="mb-2 text-xs font-black uppercase tracking-wide text-budget-text/45">
+            Quick add
+          </p>
+          <div className="flex gap-2 overflow-x-auto pb-1">
+            {presets.map((preset) => (
+              <button
+                className="shrink-0 rounded-full border border-budget-border bg-budget-background px-3 py-2 text-xs font-black text-budget-text transition hover:border-budget-primary hover:text-budget-primary"
+                key={preset.id}
+                onClick={() => {
+                  setType(preset.type);
+                  setAmount(String(preset.amount));
+                  setCategory(preset.category);
+                  setPaymentMethod(preset.payment_method);
+                  setNote(preset.note);
+                  setDate(formatISO(new Date(), { representation: "date" }));
+                }}
+                type="button"
+              >
+                {preset.label}
+              </button>
+            ))}
+          </div>
+        </div>
         <form className="grid gap-4 sm:grid-cols-2" onSubmit={handleSubmit}>
           <label className="grid gap-2 text-sm font-bold">
             Type
@@ -84,26 +120,50 @@ export function AddTransactionDialog({
           </label>
           <label className="grid gap-2 text-sm font-bold">
             Amount
-            <input className="budget-input" min="0" name="amount" placeholder="PHP 0" required type="number" />
+            <input
+              className="budget-input"
+              min="0"
+              onChange={(event) => setAmount(event.target.value)}
+              placeholder="PHP 0"
+              required
+              type="number"
+              value={amount}
+            />
           </label>
           <label className="grid gap-2 text-sm font-bold">
             Category
-            <input className="budget-input" name="category" placeholder="Food, Bills, Salary..." />
+            <input
+              className="budget-input"
+              onChange={(event) => setCategory(event.target.value)}
+              placeholder="Food, Bills, Salary..."
+              value={category}
+            />
           </label>
           <label className="grid gap-2 text-sm font-bold">
             Date
-            <input className="budget-input" name="date" type="date" />
+            <input
+              className="budget-input"
+              onChange={(event) => setDate(event.target.value)}
+              type="date"
+              value={date}
+            />
           </label>
           <label className="grid gap-2 text-sm font-bold">
             Payment Method
-            <input className="budget-input" name="payment_method" placeholder="Cash, card, e-wallet" />
+            <input
+              className="budget-input"
+              onChange={(event) => setPaymentMethod(event.target.value)}
+              placeholder="Cash, card, e-wallet"
+              value={paymentMethod}
+            />
           </label>
           <label className="grid gap-2 text-sm font-bold sm:col-span-2">
             Notes
             <textarea
               className="budget-input min-h-28 resize-none"
-              name="note"
+              onChange={(event) => setNote(event.target.value)}
               placeholder="Optional details for future you"
+              value={note}
             />
           </label>
           <div className="flex flex-col-reverse gap-3 sm:col-span-2 sm:flex-row sm:justify-end">

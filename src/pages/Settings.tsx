@@ -14,6 +14,7 @@ import {
 import { useEffect, useState } from "react";
 import { PageHeader } from "../components/dashboard/PageHeader";
 import { SyncStatusIndicator } from "../components/layout/SyncStatusIndicator";
+import { ThemeToggle } from "../components/layout/ThemeToggle";
 import { Badge } from "../components/ui/Badge";
 import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
@@ -32,9 +33,9 @@ import {
   subscribeToPwaInstallPrompt,
 } from "../lib/pwaInstall";
 import {
-  getReminderSoundEnabled,
+  getReminderSoundMode,
   playReminderSound,
-  setReminderSoundEnabled,
+  setReminderSoundMode,
 } from "../lib/sound";
 import { hasSupabaseConfig } from "../lib/supabase";
 import {
@@ -44,7 +45,12 @@ import {
 } from "../lib/syncErrorStore";
 import { syncPendingRecords } from "../lib/syncEngine";
 import { useSyncStatus } from "../hooks/useSyncStatus";
-import type { BudgetCatSyncError, ExportType, NotificationStatus } from "../types/finance";
+import type {
+  BudgetCatSyncError,
+  ExportType,
+  NotificationStatus,
+  ReminderSoundMode,
+} from "../types/finance";
 
 export function Settings() {
   const { signOut, user } = useAuth();
@@ -55,7 +61,7 @@ export function Settings() {
     useState<NotificationStatus>(() => getNotificationPermission());
   const [notificationMessage, setNotificationMessage] = useState<string | null>(null);
   const [exportMessage, setExportMessage] = useState<string | null>(null);
-  const [soundEnabled, setSoundEnabled] = useState(() => getReminderSoundEnabled());
+  const [soundMode, setSoundMode] = useState<ReminderSoundMode>(() => getReminderSoundMode());
   const [canInstallPwa, setCanInstallPwa] = useState(() => canPromptPwaInstall());
   const [pwaMessage, setPwaMessage] = useState<string | null>(null);
   const syncStatus = useSyncStatus();
@@ -175,9 +181,15 @@ export function Settings() {
       });
   }
 
-  function handleSoundPreferenceChange(enabled: boolean) {
-    setSoundEnabled(enabled);
-    setReminderSoundEnabled(enabled);
+  function handleSoundPreferenceChange(mode: ReminderSoundMode) {
+    setSoundMode(mode);
+    setReminderSoundMode(mode);
+  }
+
+  async function handleTestMeowSound() {
+    setSoundMode("meow");
+    setReminderSoundMode("meow");
+    await playReminderSound("meow");
   }
 
   async function handleInstallPwa() {
@@ -238,7 +250,7 @@ export function Settings() {
                   </div>
                   <div className="h-2 overflow-hidden rounded-full bg-budget-background ring-1 ring-budget-border">
                     <div
-                      className="h-full rounded-full bg-budget-primary transition-all"
+                      className="h-full rounded-full bg-budget-primary transition-all duration-500 ease-out"
                       style={{ width: `${syncStatus.percentComplete}%` }}
                     />
                   </div>
@@ -290,16 +302,22 @@ export function Settings() {
                   {notificationMessage}
                 </p>
               )}
-              <label className="mt-4 flex max-w-sm items-center justify-between gap-4 rounded-lg bg-budget-background p-4 text-sm font-bold">
+              <label className="mt-4 grid max-w-sm gap-2 rounded-lg bg-budget-background p-4 text-sm font-bold">
                 <span className="inline-flex items-center gap-2">
                   <Volume2 size={18} />
                   Reminder sound
                 </span>
-                <input
-                  checked={soundEnabled}
-                  onChange={(event) => handleSoundPreferenceChange(event.target.checked)}
-                  type="checkbox"
-                />
+                <select
+                  className="budget-input"
+                  onChange={(event) =>
+                    handleSoundPreferenceChange(event.target.value as ReminderSoundMode)
+                  }
+                  value={soundMode}
+                >
+                  <option value="meow">Meow</option>
+                  <option value="chime">Soft Chime</option>
+                  <option value="off">Off</option>
+                </select>
               </label>
             </div>
             <div className="flex flex-col gap-3 sm:flex-row">
@@ -309,6 +327,9 @@ export function Settings() {
               </Button>
               <Button onClick={handleTestNotification} variant="secondary">
                 Test Notification
+              </Button>
+              <Button onClick={handleTestMeowSound} variant="secondary">
+                Test Meow Sound
               </Button>
             </div>
           </div>
@@ -405,6 +426,10 @@ export function Settings() {
         <Card className="p-5">
           <h2 className="text-lg font-black">App Preferences</h2>
           <div className="mt-4 grid gap-3 md:grid-cols-2">
+            <div className="flex items-center justify-between gap-4 rounded-lg bg-budget-background p-4 text-sm font-bold">
+              Theme
+              <ThemeToggle />
+            </div>
             <label className="flex items-center justify-between gap-4 rounded-lg bg-budget-background p-4 text-sm font-bold">
               Warm dashboard density
               <input defaultChecked type="checkbox" />

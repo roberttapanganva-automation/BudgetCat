@@ -9,7 +9,7 @@ export function Card({ children, className, ...props }: CardProps) {
   return (
     <section
       className={cn(
-        "rounded-lg border border-budget-border bg-budget-card p-5 shadow-soft",
+        "rounded-[var(--budget-radius)] border border-budget-border bg-budget-card p-5 shadow-soft",
         className,
       )}
       {...props}

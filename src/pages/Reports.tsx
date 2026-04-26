@@ -22,7 +22,7 @@ import { calculateMonthlySummary, getTopSpendingCategory } from "../lib/calculat
 import { db } from "../lib/localDb";
 import { formatCurrency } from "../lib/utils";
 
-const chartColors = ["#E6A44E", "#F2B84B", "#7FA77B", "#D96B5F", "#4F8F5B"];
+const chartColors = ["#E8870A", "#2D7A52", "#4A9E6E", "#C0392B", "#1E5C3A"];
 
 export function Reports() {
   const { user } = useAuth();
@@ -74,19 +74,19 @@ export function Reports() {
       <section className="mb-5 grid gap-4 sm:grid-cols-3">
         <Card className="p-4">
           <p className="text-sm font-bold text-budget-text/55">Income</p>
-          <p className="mt-2 break-words text-2xl font-black text-budget-success">
+          <p className="mt-2 break-words font-display text-2xl font-black text-budget-success">
             {formatCurrency(summary.income)}
           </p>
         </Card>
         <Card className="p-4">
           <p className="text-sm font-bold text-budget-text/55">Expenses</p>
-          <p className="mt-2 break-words text-2xl font-black text-budget-text">
+          <p className="mt-2 break-words font-display text-2xl font-black text-budget-text">
             {formatCurrency(summary.expenses)}
           </p>
         </Card>
         <Card className="p-4">
           <p className="text-sm font-bold text-budget-text/55">Savings</p>
-          <p className="mt-2 break-words text-2xl font-black text-budget-primary">
+          <p className="mt-2 break-words font-display text-2xl font-black text-budget-primary">
             {formatCurrency(summary.savings)}
           </p>
         </Card>
@@ -100,12 +100,12 @@ export function Reports() {
           <ReportCard subtitle="Monthly local data comparison" title="Income vs Expenses">
             <ResponsiveContainer height="100%" minWidth={0} width="100%">
               <BarChart data={monthlyData} margin={{ bottom: 8, left: 0, right: 0, top: 8 }}>
-                <CartesianGrid stroke="#E8DED0" vertical={false} />
-                <XAxis dataKey="month" stroke="#2E2A24" tickLine={false} />
+                <CartesianGrid stroke="var(--budget-cream-3)" vertical={false} />
+                <XAxis dataKey="month" stroke="var(--budget-text-secondary)" tickLine={false} />
                 <YAxis hide />
                 <Tooltip />
-                <Bar dataKey="income" fill="#4F8F5B" radius={[8, 8, 0, 0]} />
-                <Bar dataKey="expenses" fill="#F2B84B" radius={[8, 8, 0, 0]} />
+                <Bar dataKey="income" fill="var(--budget-success)" radius={[8, 8, 0, 0]} />
+                <Bar dataKey="expenses" fill="var(--budget-warning)" radius={[8, 8, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </ReportCard>
@@ -132,15 +132,15 @@ export function Reports() {
           <ReportCard subtitle="Savings and goal contributions" title="Monthly Savings Progress">
             <ResponsiveContainer height="100%" minWidth={0} width="100%">
               <AreaChart data={monthlyData} margin={{ bottom: 8, left: 0, right: 0, top: 8 }}>
-                <CartesianGrid stroke="#E8DED0" vertical={false} />
-                <XAxis dataKey="month" stroke="#2E2A24" tickLine={false} />
+                <CartesianGrid stroke="var(--budget-cream-3)" vertical={false} />
+                <XAxis dataKey="month" stroke="var(--budget-text-secondary)" tickLine={false} />
                 <YAxis hide />
                 <Tooltip />
                 <Area
                   dataKey="savings"
-                  fill="#4F8F5B"
+                  fill="var(--budget-success)"
                   fillOpacity={0.18}
-                  stroke="#4F8F5B"
+                  stroke="var(--budget-success)"
                   strokeWidth={3}
                   type="monotone"
                 />

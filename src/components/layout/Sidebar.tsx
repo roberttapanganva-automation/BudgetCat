@@ -8,8 +8,10 @@ import {
 } from "lucide-react";
 import { NavLink } from "react-router-dom";
 import { cn } from "../../lib/utils";
+import { AddTransactionDialog } from "../transactions/AddTransactionDialog";
 import { Logo } from "./Logo";
 import { SyncStatusIndicator } from "./SyncStatusIndicator";
+import { ThemeToggle } from "./ThemeToggle";
 
 const navItems = [
   { label: "Dashboard", href: "/", icon: Home },
@@ -22,17 +24,20 @@ const navItems = [
 
 export function Sidebar() {
   return (
-    <aside className="fixed inset-y-0 left-0 hidden w-72 border-r border-budget-border bg-white/80 p-6 backdrop-blur-xl md:block">
-      <Logo />
-      <nav className="mt-10 grid gap-2">
+    <aside className="fixed inset-y-0 left-0 z-40 hidden w-[var(--budget-sidebar-width)] flex-col border-r border-budget-border bg-budget-card md:flex">
+      <div className="border-b border-budget-border px-5 py-5">
+        <Logo />
+      </div>
+      <nav className="grid flex-1 gap-1 px-3 py-4">
+        <p className="px-2 py-2 text-[10px] font-black uppercase text-budget-text/40">Main</p>
         {navItems.map((item) => (
           <NavLink
             className={({ isActive }) =>
               cn(
-                "flex items-center gap-3 rounded-lg px-4 py-3 text-sm font-bold text-budget-text/70 transition",
+                "flex items-center gap-3 rounded-lg px-3 py-2.5 text-[13.5px] font-bold text-budget-text/65 transition",
                 isActive
-                  ? "bg-budget-primary text-white shadow-button"
-                  : "hover:bg-budget-background hover:text-budget-text",
+                  ? "bg-[var(--budget-green-faint)] text-budget-primary"
+                  : "hover:bg-[var(--budget-cream-2)] hover:text-budget-text",
               )
             }
             end={item.href === "/"}
@@ -43,11 +48,18 @@ export function Sidebar() {
             {item.label}
           </NavLink>
         ))}
+        <AddTransactionDialog
+          className="mt-2 w-full justify-start rounded-lg px-3 py-2.5 text-[13.5px]"
+          label="Add Transaction"
+        />
       </nav>
-      <div className="absolute bottom-6 left-6 right-6 rounded-lg border border-budget-border bg-budget-background p-4">
-        <SyncStatusIndicator />
-        <p className="text-sm font-black">Private budget space</p>
-        <p className="mt-1 text-xs leading-5 text-budget-text/60">
+      <div className="border-t border-budget-border p-3">
+        <div className="mb-2 rounded-lg bg-[var(--budget-cream-2)] p-3">
+          <SyncStatusIndicator showProgress />
+        </div>
+        <ThemeToggle />
+        <p className="mt-3 text-sm font-black">Private budget space</p>
+        <p className="mt-1 text-xs leading-5 text-budget-text/55">
           Manual tracking for two people, with room for Bonnie and Clyde.
         </p>
       </div>

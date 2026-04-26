@@ -34,16 +34,26 @@ export function SyncStatusIndicator({ showProgress = false }: { showProgress?: b
     label = "Offline mode";
     tone = "warning";
   } else if (syncStatus.isSyncing) {
-    label = `Syncing ${syncStatus.syncedCount + syncStatus.failedCount} of ${syncStatus.totalPending}`;
+    label =
+      syncStatus.totalPending > 0
+        ? `Syncing ${syncStatus.syncedCount + syncStatus.failedCount} of ${syncStatus.totalPending}`
+        : "Checking sync queue";
     tone = "cat";
   } else if (syncStatus.syncError) {
-    label = "Sync failed, tap to retry";
+    label =
+      syncStatus.failedCount > 0
+        ? `${syncStatus.failedCount} failed, tap retry`
+        : "Sync failed, tap retry";
     tone = "urgent";
   } else if (pendingCount > 0) {
     label = `${pendingCount} pending change${pendingCount === 1 ? "" : "s"}`;
     tone = "cat";
   } else if (syncStatus.lastSyncedAt) {
-    label = `Last synced ${formatDistanceToNow(new Date(syncStatus.lastSyncedAt), { addSuffix: true })}`;
+    const syncedAt = new Date(syncStatus.lastSyncedAt);
+    label =
+      Date.now() - syncedAt.getTime() < 6000
+        ? "All synced"
+        : `Last synced ${formatDistanceToNow(syncedAt, { addSuffix: true })}`;
     tone = "success";
   }
 
@@ -55,11 +65,23 @@ export function SyncStatusIndicator({ showProgress = false }: { showProgress?: b
     <div className="min-w-0">
       <Badge tone={tone}>{label}</Badge>
       {syncStatus.isSyncing && (
-        <div className="mt-2 h-2 overflow-hidden rounded-full bg-budget-background ring-1 ring-budget-border">
+        <div className="mt-2 min-w-36">
+          <div className="mb-1 flex items-center justify-between gap-3 text-[11px] font-black uppercase tracking-wide text-budget-text/45">
+            <span className="truncate">{syncStatus.currentTable ?? "Sync"}</span>
+            {syncStatus.totalPending > 0 && <span>{syncStatus.percentComplete}%</span>}
+          </div>
+          <div className="h-2 overflow-hidden rounded-full bg-budget-background ring-1 ring-budget-border">
           <div
-            className="h-full rounded-full bg-budget-primary transition-all"
-            style={{ width: `${syncStatus.percentComplete}%` }}
+            className={
+              syncStatus.totalPending > 0
+                ? "h-full rounded-full bg-budget-primary transition-all duration-500 ease-out"
+                : "budget-indeterminate-bar h-full rounded-full bg-budget-primary"
+            }
+            style={{
+              width: syncStatus.totalPending > 0 ? `${syncStatus.percentComplete}%` : "45%",
+            }}
           />
+          </div>
         </div>
       )}
     </div>

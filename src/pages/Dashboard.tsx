@@ -1,5 +1,6 @@
 import {
   Banknote,
+  BarChart3,
   CalendarDays,
   PiggyBank,
   Target,
@@ -87,6 +88,9 @@ export function Dashboard() {
         subtitle="A live snapshot from your local BudgetCat data."
         title={`Good evening${user?.email ? `, ${user.email.split("@")[0]}` : ""}`}
       />
+      <div className="mb-4 sm:hidden">
+        <SyncStatusIndicator showProgress />
+      </div>
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard
           helper="Income minus expenses and savings"
@@ -138,16 +142,16 @@ export function Dashboard() {
           <PreviewPanel title="Upcoming due dates" to="/due-dates">
             <div className="grid gap-3">
               {dueDates.slice(0, 2).map((bill) => (
-                <div
-                  className="flex items-center justify-between gap-3 rounded-lg bg-budget-background p-3"
-                  key={bill.id}
-                >
-                  <div className="flex items-center gap-3">
+              <div
+                className="flex min-w-0 items-center justify-between gap-3 rounded-lg bg-budget-background p-3"
+                key={bill.id}
+              >
+                  <div className="flex min-w-0 items-center gap-3">
                     <div className="grid h-10 w-10 place-items-center rounded-lg bg-budget-warning/25">
                       <CalendarDays size={18} />
                     </div>
-                    <div>
-                      <p className="font-black">{bill.title}</p>
+                    <div className="min-w-0">
+                      <p className="truncate font-black">{bill.title}</p>
                       <p className="text-xs font-semibold text-budget-text/55">
                         {formatCurrency(bill.amount)} - {getDueDateStatus(bill)}
                       </p>
@@ -194,11 +198,11 @@ export function Dashboard() {
           <div className="grid gap-3">
             {recentTransactions.map((transaction) => (
               <div
-                className="flex items-center justify-between gap-3 rounded-lg border border-budget-border bg-white p-3"
+                className="flex min-w-0 items-center justify-between gap-3 rounded-lg border border-budget-border bg-budget-card p-3"
                 key={transaction.id}
               >
-                <div>
-                  <p className="font-black">{transaction.category}</p>
+                <div className="min-w-0">
+                  <p className="truncate font-black">{transaction.category}</p>
                   <p className="text-xs font-semibold text-budget-text/55">
                     {transaction.type.replace("_", " ")} - {format(parseISO(transaction.date), "MMM d")}
                   </p>
@@ -220,6 +224,37 @@ export function Dashboard() {
                 No transactions yet.
               </p>
             )}
+          </div>
+        </PreviewPanel>
+      </section>
+      <section className="mt-6">
+        <PreviewPanel title="Reports preview" to="/reports">
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div className="rounded-lg bg-budget-background p-4">
+              <div className="mb-2 flex items-center gap-2 text-budget-primary">
+                <BarChart3 size={17} />
+                <p className="text-xs font-black uppercase tracking-wide">Income</p>
+              </div>
+              <p className="font-display text-xl font-black">
+                {formatCurrency(summary.income)}
+              </p>
+            </div>
+            <div className="rounded-lg bg-budget-background p-4">
+              <p className="text-xs font-black uppercase tracking-wide text-budget-text/45">
+                Expenses
+              </p>
+              <p className="mt-2 font-display text-xl font-black">
+                {formatCurrency(summary.expenses)}
+              </p>
+            </div>
+            <div className="rounded-lg bg-budget-background p-4">
+              <p className="text-xs font-black uppercase tracking-wide text-budget-text/45">
+                Savings
+              </p>
+              <p className="mt-2 font-display text-xl font-black text-budget-success">
+                {formatCurrency(summary.savings)}
+              </p>
+            </div>
           </div>
         </PreviewPanel>
       </section>

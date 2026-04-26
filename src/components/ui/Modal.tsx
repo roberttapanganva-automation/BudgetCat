@@ -17,7 +17,7 @@ export function Modal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-end bg-budget-text/30 p-3 backdrop-blur-sm sm:items-center sm:justify-center">
-      <div className="w-full max-w-2xl rounded-lg border border-budget-border bg-white p-5 shadow-soft">
+      <div className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-[var(--budget-radius)] border border-budget-border bg-budget-card p-5 shadow-soft">
         <div className="mb-5 flex items-center justify-between gap-4">
           <h2 className="text-xl font-bold text-budget-text">{title}</h2>
           <Button

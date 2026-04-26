@@ -23,11 +23,12 @@ export function StatCard({
   }[tone];
 
   return (
-    <Card className="min-w-0 p-4">
+    <Card className="relative min-w-0 overflow-hidden p-4">
+      <div className="absolute inset-x-0 top-0 h-1 bg-budget-primary/70" />
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-sm font-bold text-budget-text/55">{title}</p>
-          <p className="mt-2 break-words text-2xl font-black text-budget-text">
+          <p className="mt-2 break-words font-display text-2xl font-black text-budget-text">
             {formatCurrency(value)}
           </p>
         </div>

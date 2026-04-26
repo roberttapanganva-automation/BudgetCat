@@ -1,4 +1,5 @@
 import { Heart, Sparkles } from "lucide-react";
+import { BudgetCatMascot } from "../mascot/BudgetCatMascot";
 import { Card } from "../ui/Card";
 
 export function MascotCard() {
@@ -20,14 +21,14 @@ export function MascotCard() {
         </p>
         <div className="mt-5 grid grid-cols-2 gap-3 sm:max-w-md">
           <div className="rounded-lg border border-budget-border bg-budget-background p-4">
-            <div className="mx-auto h-20 w-20 rounded-full border-4 border-budget-border bg-white shadow-soft" />
+            <BudgetCatMascot className="mx-auto grid h-20 w-20 place-items-center" variant="bonnie" />
             <p className="mt-3 text-center text-sm font-black">Bonnie</p>
             <p className="text-center text-xs font-semibold text-budget-text/55">
               White cat
             </p>
           </div>
           <div className="rounded-lg border border-budget-border bg-budget-background p-4">
-            <div className="mx-auto h-20 w-20 rounded-full border-4 border-white bg-budget-cat shadow-soft" />
+            <BudgetCatMascot className="mx-auto grid h-20 w-20 place-items-center" variant="clyde" />
             <p className="mt-3 text-center text-sm font-black">Clyde</p>
             <p className="text-center text-xs font-semibold text-budget-text/55">
               Orange cat

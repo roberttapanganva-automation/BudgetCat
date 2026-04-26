@@ -13,9 +13,11 @@ import { Reports } from "./pages/Reports";
 import { Settings } from "./pages/Settings";
 import { Transactions } from "./pages/Transactions";
 import { initPwaInstallListener } from "./lib/pwaInstall";
+import { applyTheme, getPreferredTheme } from "./lib/theme";
 import "./styles/globals.css";
 
 initPwaInstallListener();
+applyTheme(getPreferredTheme());
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>

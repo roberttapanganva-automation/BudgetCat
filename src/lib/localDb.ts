@@ -138,6 +138,106 @@ export async function addLocalGoal(
   return record;
 }
 
+export async function addLocalGoalContribution(
+  data: Omit<LocalGoalContribution, keyof LocalRecord>,
+  userId: string,
+  householdId: string,
+) {
+  const record = withRecordMeta(data, userId, householdId) as LocalGoalContribution;
+  const timestamp = nowIso();
+
+  await db.transaction("rw", db.goal_contributions, db.goals, db.sync_queue, async () => {
+    await db.goal_contributions.add(record);
+    const goal = await db.goals.get(record.goal_id);
+    if (goal) {
+      await db.goals.update(goal.id, {
+        current_amount: Number(goal.current_amount || 0) + Number(record.amount || 0),
+        sync_status: "pending",
+        updated_at: timestamp,
+      });
+      await enqueueSync("goals", goal.id);
+    }
+    await enqueueSync("goal_contributions", record.id);
+  });
+
+  return record;
+}
+
+export async function updateLocalTransaction(
+  recordId: string,
+  patch: Partial<Omit<LocalTransaction, keyof LocalRecord>>,
+) {
+  await db.transaction("rw", db.transactions, db.sync_queue, async () => {
+    await db.transactions.update(recordId, {
+      ...patch,
+      sync_status: "pending",
+      updated_at: nowIso(),
+    });
+    await enqueueSync("transactions", recordId);
+  });
+}
+
+export async function softDeleteLocalTransaction(recordId: string) {
+  await db.transaction("rw", db.transactions, db.sync_queue, async () => {
+    await db.transactions.update(recordId, {
+      deleted_at: nowIso(),
+      sync_status: "pending",
+      updated_at: nowIso(),
+    });
+    await enqueueSync("transactions", recordId, "delete");
+  });
+}
+
+export async function updateLocalDueDate(
+  recordId: string,
+  patch: Partial<Omit<LocalDueDate, keyof LocalRecord>>,
+) {
+  await db.transaction("rw", db.due_dates, db.sync_queue, async () => {
+    await db.due_dates.update(recordId, {
+      ...patch,
+      sync_status: "pending",
+      updated_at: nowIso(),
+    });
+    await enqueueSync("due_dates", recordId);
+  });
+}
+
+export async function softDeleteLocalDueDate(recordId: string) {
+  await db.transaction("rw", db.due_dates, db.sync_queue, async () => {
+    await db.due_dates.update(recordId, {
+      deleted_at: nowIso(),
+      sync_status: "pending",
+      updated_at: nowIso(),
+    });
+    await enqueueSync("due_dates", recordId, "delete");
+  });
+}
+
+export async function updateLocalGoal(
+  recordId: string,
+  patch: Partial<Omit<LocalGoal, keyof LocalRecord>>,
+) {
+  await db.transaction("rw", db.goals, db.sync_queue, async () => {
+    await db.goals.update(recordId, {
+      ...patch,
+      sync_status: "pending",
+      updated_at: nowIso(),
+    });
+    await enqueueSync("goals", recordId);
+  });
+}
+
+export async function softDeleteLocalGoal(recordId: string) {
+  await db.transaction("rw", db.goals, db.sync_queue, async () => {
+    await db.goals.update(recordId, {
+      deleted_at: nowIso(),
+      sync_status: "pending",
+      updated_at: nowIso(),
+    });
+    await enqueueSync("goals", recordId, "delete");
+  });
+}
+
 export async function markRecordSyncStatus(
   tableName: SyncQueueItem["table_name"],
   recordId: string,

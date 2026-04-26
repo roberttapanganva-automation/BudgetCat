@@ -1,5 +1,5 @@
-import { Sparkles } from "lucide-react";
 import type { CoachMessage } from "../../types/finance";
+import { BudgetCatMascot } from "../mascot/BudgetCatMascot";
 import { Badge } from "../ui/Badge";
 import { Card } from "../ui/Card";
 
@@ -16,9 +16,7 @@ export function CoachCard({ message }: { message?: CoachMessage }) {
     return (
       <Card className="p-4">
         <div className="flex items-center gap-3">
-          <div className="grid h-10 w-10 place-items-center rounded-lg bg-budget-cat/20 text-budget-cat">
-            <Sparkles size={18} />
-          </div>
+          <BudgetCatMascot variant="both" />
           <div>
             <p className="font-black">BudgetCat Coach</p>
             <p className="text-sm font-semibold text-budget-text/60">
@@ -33,9 +31,11 @@ export function CoachCard({ message }: { message?: CoachMessage }) {
   return (
     <Card className="p-4">
       <div className="flex items-start gap-3">
-        <div className="grid h-11 w-11 shrink-0 place-items-center rounded-lg bg-budget-cat/20 text-budget-cat">
-          <Sparkles size={19} />
-        </div>
+        <BudgetCatMascot
+          variant={
+            message.mascot === "Bonnie" ? "bonnie" : message.mascot === "Clyde" ? "clyde" : "both"
+          }
+        />
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <p className="font-black">{message.title}</p>

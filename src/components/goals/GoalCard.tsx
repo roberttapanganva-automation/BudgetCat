@@ -7,10 +7,21 @@ import {
 } from "../../lib/calculations";
 import { formatCurrency } from "../../lib/utils";
 import type { LocalGoal } from "../../types/finance";
+import { Button } from "../ui/Button";
 import { Card } from "../ui/Card";
 import { Progress } from "../ui/Progress";
 
-export function GoalCard({ goal }: { goal: LocalGoal }) {
+export function GoalCard({
+  goal,
+  onAddContribution,
+  onDelete,
+  onEdit,
+}: {
+  goal: LocalGoal;
+  onAddContribution?: (goal: LocalGoal) => void;
+  onDelete?: (goal: LocalGoal) => void;
+  onEdit?: (goal: LocalGoal) => void;
+}) {
   const progress = getGoalProgress(goal);
 
   return (
@@ -40,6 +51,25 @@ export function GoalCard({ goal }: { goal: LocalGoal }) {
           Suggested monthly amount: {formatCurrency(getSuggestedMonthlySaving(goal))}
         </p>
       </div>
+      {(onAddContribution || onEdit || onDelete) && (
+        <div className="mt-5 flex flex-wrap gap-2">
+          {onEdit && (
+            <Button onClick={() => onEdit(goal)} variant="secondary">
+              Edit
+            </Button>
+          )}
+          {onAddContribution && (
+            <Button onClick={() => onAddContribution(goal)} variant="secondary">
+              Add Contribution
+            </Button>
+          )}
+          {onDelete && (
+            <Button onClick={() => onDelete(goal)} variant="ghost">
+              Delete
+            </Button>
+          )}
+        </div>
+      )}
     </Card>
   );
 }
