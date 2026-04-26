@@ -1,0 +1,54 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --budget-background: #fff8ef;
+  --budget-card: #ffffff;
+  --budget-primary: #7fa77b;
+  --budget-text: #2e2a24;
+  --budget-cat: #e6a44e;
+  --budget-success: #4f8f5b;
+  --budget-warning: #f2b84b;
+  --budget-urgent: #d96b5f;
+  --budget-border: #e8ded0;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  background: var(--budget-background);
+  color: var(--budget-text);
+  font-family:
+    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    sans-serif;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+@layer base {
+  a {
+    color: inherit;
+    text-decoration: none;
+  }
+}
+
+@layer components {
+  .budget-input {
+    @apply w-full rounded-lg border border-budget-border bg-white px-4 py-3 text-sm text-budget-text outline-none transition placeholder:text-budget-text/40 focus:border-budget-primary focus:ring-4 focus:ring-budget-primary/15;
+  }
+}

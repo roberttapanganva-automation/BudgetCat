@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192" role="img" aria-label="BudgetCat icon">
+  <rect width="192" height="192" rx="36" fill="#7FA77B"/>
+  <circle cx="96" cy="104" r="52" fill="#FFF8EF"/>
+  <path d="M55 70 70 36l20 28M137 70 122 36l-20 28" fill="#FFF8EF" stroke="#2E2A24" stroke-width="8" stroke-linejoin="round"/>
+  <circle cx="76" cy="102" r="7" fill="#2E2A24"/>
+  <circle cx="116" cy="102" r="7" fill="#2E2A24"/>
+  <path d="M88 122c7 7 15 7 22 0" fill="none" stroke="#2E2A24" stroke-width="7" stroke-linecap="round"/>
+  <circle cx="140" cy="54" r="18" fill="#E6A44E"/>
+</svg>

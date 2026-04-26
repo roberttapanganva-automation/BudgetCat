@@ -1,0 +1,24 @@
+{
+  "name": "BudgetCat",
+  "short_name": "BudgetCat",
+  "description": "Private personal budget tracker",
+  "theme_color": "#7FA77B",
+  "background_color": "#FFF8EF",
+  "display": "standalone",
+  "start_url": "/",
+  "scope": "/",
+  "icons": [
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/maskable.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ]
+}

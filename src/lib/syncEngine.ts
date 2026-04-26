@@ -1,0 +1,370 @@
+import type { User } from "@supabase/supabase-js";
+import { getOrCreateHousehold } from "./household";
+import { db, markRecordSyncStatus } from "./localDb";
+import { hasSupabaseConfig, supabase } from "./supabase";
+import { setLatestSyncError } from "./syncErrorStore";
+import type {
+  BudgetCatSyncError,
+  BudgetCatUser,
+  LocalDueDate,
+  LocalGoal,
+  LocalGoalContribution,
+  LocalTransaction,
+  SyncQueueItem,
+} from "../types/finance";
+
+type SupabasePayload = Record<string, string | number | number[] | null>;
+
+type SyncResult = {
+  ok: boolean;
+  synced: number;
+  failed: number;
+  skippedReason?: string;
+  latestError?: BudgetCatSyncError | null;
+};
+
+type SupabaseErrorLike = {
+  message: string;
+  details?: string | null;
+  hint?: string | null;
+  code?: string | null;
+};
+
+function canSync() {
+  return Boolean(hasSupabaseConfig && supabase && navigator.onLine);
+}
+
+function fallbackTransactionType(type: LocalTransaction["type"]) {
+  return type === "income" || type === "salary" ? "income" : "expense";
+}
+
+function transactionPayloads(record: LocalTransaction): SupabasePayload[] {
+  const amount = Number(record.amount || 0);
+
+  return [
+    {
+      id: record.id,
+      household_id: record.household_id,
+      user_id: record.user_id,
+      type: record.type,
+      amount,
+      category: record.category || "Uncategorized",
+      date: record.date,
+      payment_method: record.payment_method || "Cash",
+      note: record.note || null,
+      created_at: record.created_at,
+      updated_at: record.updated_at,
+      deleted_at: record.deleted_at ?? null,
+    },
+    {
+      id: record.id,
+      household_id: record.household_id,
+      user_id: record.user_id,
+      title: record.category || record.type || "Transaction",
+      type: fallbackTransactionType(record.type),
+      amount,
+      transaction_date: record.date,
+      notes: record.note || null,
+      created_at: record.created_at,
+      updated_at: record.updated_at,
+      deleted_at: record.deleted_at ?? null,
+    },
+  ];
+}
+
+function dueDatePayloads(record: LocalDueDate): SupabasePayload[] {
+  const base = {
+    id: record.id,
+    household_id: record.household_id,
+    user_id: record.user_id,
+    title: record.title || "Untitled bill",
+    amount: Number(record.amount || 0),
+    due_date: record.due_date,
+    repeat_type: record.repeat_type,
+    status: record.status,
+    created_at: record.created_at,
+    updated_at: record.updated_at,
+    deleted_at: record.deleted_at ?? null,
+  };
+
+  return [
+    {
+      ...base,
+      reminder_days: Number(record.reminder_days || 0),
+      note: record.note || null,
+    },
+    {
+      ...base,
+      reminder_days: Number(record.reminder_days || 0),
+      notes: record.note || null,
+    },
+    {
+      ...base,
+      reminder_days: [Number(record.reminder_days || 0)],
+      note: record.note || null,
+    },
+    {
+      ...base,
+      reminder_days: [Number(record.reminder_days || 0)],
+      notes: record.note || null,
+    },
+  ];
+}
+
+function goalPayloads(record: LocalGoal): SupabasePayload[] {
+  const base = {
+    id: record.id,
+    household_id: record.household_id,
+    user_id: record.user_id,
+    title: record.title || "Untitled goal",
+    target_amount: Number(record.target_amount || 0),
+    current_amount: Number(record.current_amount || 0),
+    target_date: record.target_date || null,
+    priority: record.priority,
+    status: record.status,
+    note: record.note || null,
+    created_at: record.created_at,
+    updated_at: record.updated_at,
+    deleted_at: record.deleted_at ?? null,
+  };
+
+  return [
+    {
+      ...base,
+      type: record.type,
+    },
+    {
+      ...base,
+      goal_type: record.type,
+    },
+  ];
+}
+
+function goalContributionPayloads(record: LocalGoalContribution): SupabasePayload[] {
+  const base = {
+    id: record.id,
+    household_id: record.household_id,
+    user_id: record.user_id,
+    goal_id: record.goal_id,
+    amount: Number(record.amount || 0),
+    created_at: record.created_at,
+    updated_at: record.updated_at,
+    deleted_at: record.deleted_at ?? null,
+  };
+
+  return [
+    {
+      ...base,
+      date: record.date,
+      note: record.note || null,
+    },
+    {
+      ...base,
+      contribution_date: record.date,
+      notes: record.note || null,
+    },
+  ];
+}
+
+function getPayloads(
+  tableName: SyncQueueItem["table_name"],
+  record: LocalTransaction | LocalDueDate | LocalGoal | LocalGoalContribution,
+) {
+  if (tableName === "transactions") {
+    return transactionPayloads(record as LocalTransaction);
+  }
+  if (tableName === "due_dates") {
+    return dueDatePayloads(record as LocalDueDate);
+  }
+  if (tableName === "goals") {
+    return goalPayloads(record as LocalGoal);
+  }
+  return goalContributionPayloads(record as LocalGoalContribution);
+}
+
+function logSyncError(
+  tableName: SyncQueueItem["table_name"],
+  recordId: string,
+  action: string,
+  error: SupabaseErrorLike,
+  recordSentToSupabase: SupabasePayload,
+) {
+  const latestError: BudgetCatSyncError = {
+    tableName,
+    recordId,
+    action,
+    message: error.message,
+    details: error.details,
+    hint: error.hint,
+    code: error.code,
+    createdAt: new Date().toISOString(),
+  };
+
+  console.error("[BudgetCat Sync Error]", {
+    tableName,
+    recordId,
+    action,
+    message: error.message,
+    details: error.details,
+    hint: error.hint,
+    code: error.code,
+    recordSentToSupabase,
+  });
+
+  setLatestSyncError(latestError);
+  return latestError;
+}
+
+async function markQueueSyncStatus(
+  tableName: SyncQueueItem["table_name"],
+  recordId: string,
+  syncStatus: SyncQueueItem["sync_status"],
+) {
+  await db.sync_queue
+    .where("[table_name+record_id]")
+    .equals([tableName, recordId])
+    .modify({ sync_status: syncStatus, updated_at: new Date().toISOString() });
+}
+
+async function syncRecord(
+  tableName: SyncQueueItem["table_name"],
+  record:
+    | LocalTransaction
+    | LocalDueDate
+    | LocalGoal
+    | LocalGoalContribution
+    | undefined,
+) {
+  if (!record || !supabase) {
+    return { ok: false, latestError: null };
+  }
+
+  const payloads = getPayloads(tableName, record);
+  let latestError: BudgetCatSyncError | null = null;
+
+  for (const [index, payload] of payloads.entries()) {
+    const { error } = await supabase.from(tableName).upsert(payload);
+
+    if (!error) {
+      await markRecordSyncStatus(tableName, record.id, "synced");
+      await markQueueSyncStatus(tableName, record.id, "synced");
+      return { ok: true, latestError: null };
+    }
+
+    latestError = logSyncError(
+      tableName,
+      record.id,
+      index === 0 ? "upsert" : "upsert fallback",
+      error,
+      payload,
+    );
+  }
+
+  await markRecordSyncStatus(tableName, record.id, "failed");
+  await markQueueSyncStatus(tableName, record.id, "failed");
+  return { ok: false, latestError };
+}
+
+async function syncTable(tableName: SyncQueueItem["table_name"], householdId: string) {
+  const pending = await db
+    .table(tableName)
+    .where("sync_status")
+    .anyOf(["pending", "failed"])
+    .filter((record) => record.household_id === householdId)
+    .toArray();
+
+  let synced = 0;
+  let failed = 0;
+  let latestError: BudgetCatSyncError | null = null;
+
+  for (const record of pending) {
+    const result = await syncRecord(tableName, record);
+    if (result.ok) {
+      synced += 1;
+    } else {
+      failed += 1;
+      latestError = result.latestError;
+    }
+  }
+
+  return { synced, failed, latestError };
+}
+
+export async function syncTransactions(householdId: string) {
+  return syncTable("transactions", householdId);
+}
+
+export async function syncDueDates(householdId: string) {
+  return syncTable("due_dates", householdId);
+}
+
+export async function syncGoals(householdId: string) {
+  return syncTable("goals", householdId);
+}
+
+export async function syncGoalContributions(householdId: string) {
+  return syncTable("goal_contributions", householdId);
+}
+
+export async function syncPendingRecords(
+  user?: BudgetCatUser | User,
+): Promise<SyncResult> {
+  if (!canSync()) {
+    return {
+      ok: false,
+      synced: 0,
+      failed: 0,
+      skippedReason: navigator.onLine ? "Supabase is not configured" : "Offline mode",
+      latestError: null,
+    };
+  }
+
+  if (!user?.id) {
+    return {
+      ok: false,
+      synced: 0,
+      failed: 0,
+      skippedReason: "No signed-in user for sync.",
+      latestError: null,
+    };
+  }
+
+  let householdId = "householdId" in user ? user.householdId : "";
+
+  if (!householdId && supabase) {
+    householdId = await getOrCreateHousehold(user as User);
+  }
+
+  if (!householdId) {
+    return {
+      ok: false,
+      synced: 0,
+      failed: 0,
+      skippedReason: "No household found for sync.",
+      latestError: null,
+    };
+  }
+
+  const results = await Promise.all([
+    syncTransactions(householdId),
+    syncDueDates(householdId),
+    syncGoals(householdId),
+    syncGoalContributions(householdId),
+  ]);
+
+  const synced = results.reduce((sum, result) => sum + result.synced, 0);
+  const failed = results.reduce((sum, result) => sum + result.failed, 0);
+  const latestError =
+    results.find((result) => result.latestError)?.latestError ?? null;
+
+  if (failed === 0) {
+    setLatestSyncError(null);
+  }
+
+  return {
+    ok: failed === 0,
+    synced,
+    failed,
+    latestError,
+  };
+}
