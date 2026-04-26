@@ -12,7 +12,10 @@ import { Login } from "./pages/Login";
 import { Reports } from "./pages/Reports";
 import { Settings } from "./pages/Settings";
 import { Transactions } from "./pages/Transactions";
+import { initPwaInstallListener } from "./lib/pwaInstall";
 import "./styles/globals.css";
+
+initPwaInstallListener();
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>

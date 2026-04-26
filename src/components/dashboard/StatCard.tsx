@@ -23,15 +23,15 @@ export function StatCard({
   }[tone];
 
   return (
-    <Card className="p-4">
+    <Card className="min-w-0 p-4">
       <div className="flex items-start justify-between gap-3">
-        <div>
+        <div className="min-w-0">
           <p className="text-sm font-bold text-budget-text/55">{title}</p>
-          <p className="mt-2 text-2xl font-black text-budget-text">
+          <p className="mt-2 break-words text-2xl font-black text-budget-text">
             {formatCurrency(value)}
           </p>
         </div>
-        <div className={cn("grid h-11 w-11 place-items-center rounded-lg", toneClass)}>
+        <div className={cn("grid h-11 w-11 shrink-0 place-items-center rounded-lg", toneClass)}>
           <Icon size={21} />
         </div>
       </div>

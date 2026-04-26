@@ -3,7 +3,7 @@ import { CalendarPlus } from "lucide-react";
 import { type FormEvent, useState } from "react";
 import { useAuth } from "../../contexts/AuthContext";
 import { addLocalDueDate } from "../../lib/localDb";
-import { syncDueDates } from "../../lib/syncEngine";
+import { syncPendingRecords } from "../../lib/syncEngine";
 import type { DueDateStatus, RepeatType } from "../../types/finance";
 import { Button } from "../ui/Button";
 import { Modal } from "../ui/Modal";
@@ -37,7 +37,7 @@ export function AddDueDateDialog() {
     );
 
     if (navigator.onLine) {
-      await syncDueDates(user.householdId);
+      await syncPendingRecords(user);
     }
 
     setIsOpen(false);

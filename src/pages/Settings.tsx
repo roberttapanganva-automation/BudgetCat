@@ -9,6 +9,7 @@ import {
   Smartphone,
   Trash2,
   UserRound,
+  Volume2,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { PageHeader } from "../components/dashboard/PageHeader";
@@ -23,8 +24,18 @@ import {
   getNotificationPermission,
   isNotificationSupported,
   requestNotificationPermission,
-  sendLocalNotification,
+  testBudgetCatNotification,
 } from "../lib/notifications";
+import {
+  canPromptPwaInstall,
+  promptPwaInstall,
+  subscribeToPwaInstallPrompt,
+} from "../lib/pwaInstall";
+import {
+  getReminderSoundEnabled,
+  playReminderSound,
+  setReminderSoundEnabled,
+} from "../lib/sound";
 import { hasSupabaseConfig } from "../lib/supabase";
 import {
   getLatestSyncError,
@@ -32,6 +43,7 @@ import {
   syncErrorEventName,
 } from "../lib/syncErrorStore";
 import { syncPendingRecords } from "../lib/syncEngine";
+import { useSyncStatus } from "../hooks/useSyncStatus";
 import type { BudgetCatSyncError, ExportType, NotificationStatus } from "../types/finance";
 
 export function Settings() {
@@ -43,6 +55,10 @@ export function Settings() {
     useState<NotificationStatus>(() => getNotificationPermission());
   const [notificationMessage, setNotificationMessage] = useState<string | null>(null);
   const [exportMessage, setExportMessage] = useState<string | null>(null);
+  const [soundEnabled, setSoundEnabled] = useState(() => getReminderSoundEnabled());
+  const [canInstallPwa, setCanInstallPwa] = useState(() => canPromptPwaInstall());
+  const [pwaMessage, setPwaMessage] = useState<string | null>(null);
+  const syncStatus = useSyncStatus();
   const pendingCount =
     useLiveQuery(
       () => db.sync_queue.where("sync_status").anyOf(["pending", "failed"]).count(),
@@ -57,6 +73,12 @@ export function Settings() {
 
     window.addEventListener(syncErrorEventName, handleSyncError);
     return () => window.removeEventListener(syncErrorEventName, handleSyncError);
+  }, []);
+
+  useEffect(() => {
+    return subscribeToPwaInstallPrompt(() => {
+      setCanInstallPwa(canPromptPwaInstall());
+    });
   }, []);
 
   const sections = [
@@ -105,6 +127,10 @@ export function Settings() {
     );
   }
 
+  async function handleRetryFailedSync() {
+    await handleSyncNow();
+  }
+
   async function handleClearLocalTestData() {
     const shouldClear = window.confirm(
       "Clear local offline test records? This will not delete Supabase data.",
@@ -135,14 +161,35 @@ export function Settings() {
   }
 
   function handleTestNotification() {
-    const result = sendLocalNotification(
-      "BudgetCat reminder",
-      "Bonnie & Clyde say: local reminders are working.",
-    );
-    setNotificationStatus(getNotificationPermission());
-    setNotificationMessage(
-      result.ok ? "Test notification sent." : result.reason ?? "Test notification failed.",
-    );
+    testBudgetCatNotification()
+      .then(async (result) => {
+        setNotificationStatus(result.permission);
+        setNotificationMessage(result.message);
+        if (result.ok) {
+          await playReminderSound();
+        }
+      })
+      .catch((error) => {
+        console.error("[BudgetCat Notification Test Error]", error);
+        setNotificationMessage("Test reminder could not be sent.");
+      });
+  }
+
+  function handleSoundPreferenceChange(enabled: boolean) {
+    setSoundEnabled(enabled);
+    setReminderSoundEnabled(enabled);
+  }
+
+  async function handleInstallPwa() {
+    const outcome = await promptPwaInstall();
+    if (outcome === "accepted") {
+      setPwaMessage("BudgetCat install started.");
+    } else if (outcome === "dismissed") {
+      setPwaMessage("Install was dismissed. You can try again later from the browser menu.");
+    } else {
+      setPwaMessage("Install prompt is not available yet. Use your browser install menu.");
+    }
+    setCanInstallPwa(canPromptPwaInstall());
   }
 
   async function handleExport(exportType: ExportType) {
@@ -163,6 +210,9 @@ export function Settings() {
               <RefreshCcw size={18} />
               Sync Now
             </Button>
+            <Button onClick={handleRetryFailedSync} variant="secondary">
+              Retry Failed Sync
+            </Button>
             <Button onClick={signOut} variant="secondary">
               <LogOut size={18} />
               Logout
@@ -180,6 +230,20 @@ export function Settings() {
               <p className="mt-1 text-sm font-semibold text-budget-text/55">
                 {pendingCount} pending local record{pendingCount === 1 ? "" : "s"}.
               </p>
+              {syncStatus.isSyncing && (
+                <div className="mt-3 max-w-md">
+                  <div className="mb-2 flex items-center justify-between gap-3 text-xs font-black text-budget-text/55">
+                    <span>{syncStatus.currentTable ?? "Syncing"}</span>
+                    <span>{syncStatus.percentComplete}%</span>
+                  </div>
+                  <div className="h-2 overflow-hidden rounded-full bg-budget-background ring-1 ring-budget-border">
+                    <div
+                      className="h-full rounded-full bg-budget-primary transition-all"
+                      style={{ width: `${syncStatus.percentComplete}%` }}
+                    />
+                  </div>
+                </div>
+              )}
               {syncMessage && (
                 <p className="mt-2 text-sm font-semibold text-budget-text/65">
                   {syncMessage}
@@ -201,7 +265,7 @@ export function Settings() {
                 </div>
               )}
             </div>
-            <SyncStatusIndicator />
+            <SyncStatusIndicator showProgress />
           </div>
         </Card>
         <Card className="p-5">
@@ -222,10 +286,21 @@ export function Settings() {
                 Local reminders are best-effort and may not fire if BudgetCat or the browser is closed.
               </p>
               {notificationMessage && (
-                <p className="mt-2 text-sm font-semibold text-budget-text/65">
+                <p className="mt-2 rounded-lg bg-budget-background px-4 py-3 text-sm font-semibold text-budget-text/65">
                   {notificationMessage}
                 </p>
               )}
+              <label className="mt-4 flex max-w-sm items-center justify-between gap-4 rounded-lg bg-budget-background p-4 text-sm font-bold">
+                <span className="inline-flex items-center gap-2">
+                  <Volume2 size={18} />
+                  Reminder sound
+                </span>
+                <input
+                  checked={soundEnabled}
+                  onChange={(event) => handleSoundPreferenceChange(event.target.checked)}
+                  type="checkbox"
+                />
+              </label>
             </div>
             <div className="flex flex-col gap-3 sm:flex-row">
               <Button onClick={handleEnableNotifications} variant="secondary">
@@ -280,15 +355,33 @@ export function Settings() {
             <div className="grid h-12 w-12 shrink-0 place-items-center rounded-lg bg-budget-primary/12 text-budget-primary">
               <Smartphone size={21} />
             </div>
-            <div>
+            <div className="min-w-0 flex-1">
               <h2 className="text-lg font-black">PWA Install</h2>
               <p className="mt-1 text-sm font-semibold leading-6 text-budget-text/60">
-                BudgetCat is installable from supported browser menus. Use the browser install option to keep a private app shortcut on your device.
+                BudgetCat is installable from supported browser menus. Use the install option to keep a private app shortcut on your device.
+              </p>
+              <p className="mt-2 text-sm font-semibold text-budget-text/55">
+                Chrome/Edge desktop: install icon in the address bar. Android Chrome: browser menu then Add to Home screen. iPhone Safari: Share then Add to Home Screen.
               </p>
               <p className="mt-2 text-sm font-semibold text-budget-text/55">
                 Offline mode: local entries keep saving to this device when network access is unavailable.
               </p>
+              {pwaMessage && (
+                <p className="mt-2 text-sm font-semibold text-budget-text/65">
+                  {pwaMessage}
+                </p>
+              )}
             </div>
+            <div className="hidden shrink-0 sm:block">
+              <Button disabled={!canInstallPwa} onClick={handleInstallPwa} variant="secondary">
+                Install BudgetCat
+              </Button>
+            </div>
+          </div>
+          <div className="mt-4 sm:hidden">
+            <Button className="w-full" disabled={!canInstallPwa} onClick={handleInstallPwa} variant="secondary">
+              Install BudgetCat
+            </Button>
           </div>
         </Card>
         {sections.map((section) => (

@@ -3,7 +3,7 @@ import { Plus } from "lucide-react";
 import { type FormEvent, useState } from "react";
 import { useAuth } from "../../contexts/AuthContext";
 import { addLocalGoal } from "../../lib/localDb";
-import { syncGoals } from "../../lib/syncEngine";
+import { syncPendingRecords } from "../../lib/syncEngine";
 import type { GoalPriority, GoalType } from "../../types/finance";
 import { Button } from "../ui/Button";
 import { Modal } from "../ui/Modal";
@@ -38,7 +38,7 @@ export function AddGoalDialog() {
     );
 
     if (navigator.onLine) {
-      await syncGoals(user.householdId);
+      await syncPendingRecords(user);
     }
 
     setIsOpen(false);

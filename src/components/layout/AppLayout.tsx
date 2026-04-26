@@ -6,6 +6,7 @@ import { db } from "../../lib/localDb";
 import { sendLocalNotification } from "../../lib/notifications";
 import { getDueDateReminders } from "../../lib/reminders";
 import { syncPendingRecords } from "../../lib/syncEngine";
+import { AddTransactionDialog } from "../transactions/AddTransactionDialog";
 import { MobileNav } from "./MobileNav";
 import { Sidebar } from "./Sidebar";
 
@@ -58,12 +59,15 @@ export function AppLayout() {
   return (
     <div className="min-h-screen bg-budget-background text-budget-text">
       <Sidebar />
-      <main className="min-h-screen px-4 pb-28 pt-5 md:ml-72 md:px-8 md:py-8">
+      <main className="min-h-screen px-4 pb-40 pt-5 md:ml-72 md:px-8 md:py-8">
         <div className="mx-auto w-full max-w-7xl">
           <Outlet />
         </div>
       </main>
       <MobileNav />
+      <div className="fixed bottom-24 right-4 z-40 md:hidden">
+        <AddTransactionDialog className="min-h-12 rounded-full px-5 shadow-button" label="Add" />
+      </div>
     </div>
   );
 }

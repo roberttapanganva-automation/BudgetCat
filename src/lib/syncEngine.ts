@@ -3,6 +3,7 @@ import { getOrCreateHousehold } from "./household";
 import { db, markRecordSyncStatus } from "./localDb";
 import { hasSupabaseConfig, supabase } from "./supabase";
 import { setLatestSyncError } from "./syncErrorStore";
+import { setSyncStatus } from "./syncStatusStore";
 import type {
   BudgetCatSyncError,
   BudgetCatUser,
@@ -33,6 +34,16 @@ type SupabaseErrorLike = {
 function canSync() {
   return Boolean(hasSupabaseConfig && supabase && navigator.onLine);
 }
+
+const defaultBatchSize = 25;
+const tableOrder: SyncQueueItem["table_name"][] = [
+  "transactions",
+  "due_dates",
+  "goals",
+  "goal_contributions",
+];
+
+let syncRunPromise: Promise<SyncResult> | null = null;
 
 function fallbackTransactionType(type: LocalTransaction["type"]) {
   return type === "income" || type === "salary" ? "income" : "expense";
@@ -265,19 +276,49 @@ async function syncRecord(
   return { ok: false, latestError };
 }
 
-async function syncTable(tableName: SyncQueueItem["table_name"], householdId: string) {
-  const pending = await db
-    .table(tableName)
-    .where("sync_status")
-    .anyOf(["pending", "failed"])
-    .filter((record) => record.household_id === householdId)
-    .toArray();
+function chunkRecords<T>(records: T[], batchSize: number) {
+  const chunks: T[][] = [];
+  for (let index = 0; index < records.length; index += batchSize) {
+    chunks.push(records.slice(index, index + batchSize));
+  }
+  return chunks;
+}
+
+async function syncRecordBatch(
+  tableName: SyncQueueItem["table_name"],
+  records: Array<LocalTransaction | LocalDueDate | LocalGoal | LocalGoalContribution>,
+) {
+  if (!supabase || records.length === 0) {
+    return { synced: 0, failed: 0, latestError: null as BudgetCatSyncError | null };
+  }
+
+  const primaryPayloads = records.map((record) => getPayloads(tableName, record)[0]);
+  const { error } = await supabase.from(tableName).upsert(primaryPayloads);
+
+  if (!error) {
+    await Promise.all(
+      records.flatMap((record) => [
+        markRecordSyncStatus(tableName, record.id, "synced"),
+        markQueueSyncStatus(tableName, record.id, "synced"),
+      ]),
+    );
+    return { synced: records.length, failed: 0, latestError: null };
+  }
+
+  console.warn("[BudgetCat Sync Warning] Batch sync fell back to per-record sync", {
+    tableName,
+    count: records.length,
+    message: error.message,
+    details: error.details,
+    hint: error.hint,
+    code: error.code,
+  });
 
   let synced = 0;
   let failed = 0;
   let latestError: BudgetCatSyncError | null = null;
 
-  for (const record of pending) {
+  for (const record of records) {
     const result = await syncRecord(tableName, record);
     if (result.ok) {
       synced += 1;
@@ -290,26 +331,88 @@ async function syncTable(tableName: SyncQueueItem["table_name"], householdId: st
   return { synced, failed, latestError };
 }
 
-export async function syncTransactions(householdId: string) {
-  return syncTable("transactions", householdId);
+async function getTotalPending(householdId: string) {
+  const totals = await Promise.all(
+    tableOrder.map((tableName) =>
+      db
+        .table(tableName)
+        .where("sync_status")
+        .anyOf(["pending", "failed"])
+        .filter((record) => record.household_id === householdId)
+        .count(),
+    ),
+  );
+  return totals.reduce((sum, count) => sum + count, 0);
 }
 
-export async function syncDueDates(householdId: string) {
-  return syncTable("due_dates", householdId);
+async function syncTable(
+  tableName: SyncQueueItem["table_name"],
+  householdId: string,
+  batchSize: number,
+  onProgress: (syncedDelta: number, failedDelta: number, tableName: string) => void,
+) {
+  const pending = await db
+    .table(tableName)
+    .where("sync_status")
+    .anyOf(["pending", "failed"])
+    .filter((record) => record.household_id === householdId)
+    .toArray();
+
+  let synced = 0;
+  let failed = 0;
+  let latestError: BudgetCatSyncError | null = null;
+
+  for (const batch of chunkRecords(pending, batchSize)) {
+    await new Promise((resolve) => window.setTimeout(resolve, 0));
+    const result = await syncRecordBatch(tableName, batch);
+    synced += result.synced;
+    failed += result.failed;
+    latestError = result.latestError ?? latestError;
+    onProgress(result.synced, result.failed, tableName);
+  }
+
+  return { synced, failed, latestError };
 }
 
-export async function syncGoals(householdId: string) {
-  return syncTable("goals", householdId);
+export async function syncTransactions(householdId: string, batchSize = defaultBatchSize) {
+  return syncTable("transactions", householdId, batchSize, () => undefined);
 }
 
-export async function syncGoalContributions(householdId: string) {
-  return syncTable("goal_contributions", householdId);
+export async function syncDueDates(householdId: string, batchSize = defaultBatchSize) {
+  return syncTable("due_dates", householdId, batchSize, () => undefined);
+}
+
+export async function syncGoals(householdId: string, batchSize = defaultBatchSize) {
+  return syncTable("goals", householdId, batchSize, () => undefined);
+}
+
+export async function syncGoalContributions(householdId: string, batchSize = defaultBatchSize) {
+  return syncTable("goal_contributions", householdId, batchSize, () => undefined);
 }
 
 export async function syncPendingRecords(
   user?: BudgetCatUser | User,
+  options: { batchSize?: number } = {},
+): Promise<SyncResult> {
+  if (syncRunPromise) return syncRunPromise;
+
+  syncRunPromise = runSyncPendingRecords(user, options).finally(() => {
+    syncRunPromise = null;
+  });
+
+  return syncRunPromise;
+}
+
+async function runSyncPendingRecords(
+  user?: BudgetCatUser | User,
+  options: { batchSize?: number } = {},
 ): Promise<SyncResult> {
   if (!canSync()) {
+    setSyncStatus({
+      isSyncing: false,
+      currentTable: null,
+      syncError: null,
+    });
     return {
       ok: false,
       synced: 0,
@@ -320,6 +423,10 @@ export async function syncPendingRecords(
   }
 
   if (!user?.id) {
+    setSyncStatus({
+      isSyncing: false,
+      currentTable: null,
+    });
     return {
       ok: false,
       synced: 0,
@@ -336,6 +443,10 @@ export async function syncPendingRecords(
   }
 
   if (!householdId) {
+    setSyncStatus({
+      isSyncing: false,
+      currentTable: null,
+    });
     return {
       ok: false,
       synced: 0,
@@ -345,12 +456,51 @@ export async function syncPendingRecords(
     };
   }
 
-  const results = await Promise.all([
-    syncTransactions(householdId),
-    syncDueDates(householdId),
-    syncGoals(householdId),
-    syncGoalContributions(householdId),
-  ]);
+  const totalPending = await getTotalPending(householdId);
+  const progress = {
+    syncedCount: 0,
+    failedCount: 0,
+  };
+
+  setSyncStatus({
+    totalPending,
+    syncedCount: 0,
+    failedCount: 0,
+    currentTable: totalPending > 0 ? "transactions" : null,
+    percentComplete: totalPending > 0 ? 0 : 100,
+    isSyncing: totalPending > 0,
+    syncError: null,
+  });
+
+  const updateProgress = (
+    syncedDelta: number,
+    failedDelta: number,
+    currentTable: string,
+  ) => {
+    progress.syncedCount += syncedDelta;
+    progress.failedCount += failedDelta;
+    const completed = progress.syncedCount + progress.failedCount;
+    setSyncStatus({
+      syncedCount: progress.syncedCount,
+      failedCount: progress.failedCount,
+      currentTable,
+      percentComplete:
+        totalPending === 0 ? 100 : Math.min(100, Math.round((completed / totalPending) * 100)),
+    });
+  };
+
+  const results = [];
+  for (const tableName of tableOrder) {
+    setSyncStatus({ currentTable: tableName });
+    results.push(
+      await syncTable(
+        tableName,
+        householdId,
+        options.batchSize ?? defaultBatchSize,
+        updateProgress,
+      ),
+    );
+  }
 
   const synced = results.reduce((sum, result) => sum + result.synced, 0);
   const failed = results.reduce((sum, result) => sum + result.failed, 0);
@@ -360,6 +510,17 @@ export async function syncPendingRecords(
   if (failed === 0) {
     setLatestSyncError(null);
   }
+
+  setSyncStatus({
+    totalPending,
+    syncedCount: synced,
+    failedCount: failed,
+    currentTable: null,
+    percentComplete: 100,
+    lastSyncedAt: failed === 0 ? new Date().toISOString() : undefined,
+    isSyncing: false,
+    syncError: latestError,
+  });
 
   return {
     ok: failed === 0,

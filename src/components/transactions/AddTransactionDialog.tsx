@@ -3,7 +3,7 @@ import { Plus } from "lucide-react";
 import { type FormEvent, useState } from "react";
 import { useAuth } from "../../contexts/AuthContext";
 import { addLocalTransaction } from "../../lib/localDb";
-import { syncTransactions } from "../../lib/syncEngine";
+import { syncPendingRecords } from "../../lib/syncEngine";
 import type { TransactionType } from "../../types/finance";
 import { Button } from "../ui/Button";
 import { Modal } from "../ui/Modal";
@@ -16,7 +16,13 @@ const transactionTypes: Array<{ label: string; value: TransactionType }> = [
   { label: "Goal Contribution", value: "goal_contribution" },
 ];
 
-export function AddTransactionDialog() {
+export function AddTransactionDialog({
+  className,
+  label = "Add Transaction",
+}: {
+  className?: string;
+  label?: string;
+}) {
   const { user } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const [type, setType] = useState<TransactionType>("expense");
@@ -42,7 +48,7 @@ export function AddTransactionDialog() {
     );
 
     if (navigator.onLine) {
-      await syncTransactions(user.householdId);
+      await syncPendingRecords(user);
     }
 
     setIsOpen(false);
@@ -52,9 +58,9 @@ export function AddTransactionDialog() {
 
   return (
     <>
-      <Button onClick={() => setIsOpen(true)}>
+      <Button className={className} onClick={() => setIsOpen(true)}>
         <Plus size={18} />
-        Add Transaction
+        {label}
       </Button>
       <Modal
         isOpen={isOpen}
