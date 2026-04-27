@@ -7,6 +7,7 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: "autoUpdate",
+      injectRegister: false,
       manifest: false,
       includeAssets: [
         "assets/icons/budgetcat-icon-32.png",
@@ -25,9 +26,27 @@ export default defineConfig({
         "assets/sounds/garage-cat-meow-7-fx-306186.mp3",
       ],
       workbox: {
-        globPatterns: ["**/*.{js,css,html,svg,ico,png,webmanifest}"],
+        cleanupOutdatedCaches: true,
+        clientsClaim: true,
+        skipWaiting: true,
+        globPatterns: ["**/*.{js,css,html,ico,png,svg,webp,woff2,mp3,webmanifest}"],
         navigateFallback: "/index.html",
-        runtimeCaching: [],
+        runtimeCaching: [
+          {
+            urlPattern: ({ url }) =>
+              url.origin === self.location.origin &&
+              (url.pathname.startsWith("/assets/") ||
+                url.pathname === "/manifest.webmanifest"),
+            handler: "CacheFirst",
+            options: {
+              cacheName: "budgetcat-static-assets",
+              expiration: {
+                maxEntries: 120,
+                maxAgeSeconds: 60 * 60 * 24 * 30,
+              },
+            },
+          },
+        ],
       },
     }),
   ],

@@ -49,7 +49,7 @@ export function Login() {
               <div>
                 <h1 className="text-2xl font-black text-budget-primary">BudgetCat</h1>
                 <p className="text-sm font-semibold text-budget-text/55">
-                  Private personal finance tracker
+                  Private personal finance tracker · V2
                 </p>
               </div>
             </div>
