@@ -10,7 +10,7 @@ import {
 import type { AuthError, User } from "@supabase/supabase-js";
 import { getOrCreateHousehold } from "../lib/household";
 import { ensureLocalDefaults, getLocalHouseholdId } from "../lib/localDb";
-import { hasSupabaseConfig, supabase } from "../lib/supabase";
+import { getSupabaseSessionOnce, hasSupabaseConfig, supabase } from "../lib/supabase";
 import { syncPendingRecords } from "../lib/syncEngine";
 import {
   createStartupError,
@@ -39,6 +39,10 @@ const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 const localSessionKey = "budgetcat-local-session";
 
+function storeLocalUser(user: BudgetCatUser) {
+  localStorage.setItem(localSessionKey, JSON.stringify(user));
+}
+
 async function toBudgetCatUser(user: User): Promise<BudgetCatUser | null> {
   if (!user.email) return null;
 
@@ -50,10 +54,13 @@ async function toBudgetCatUser(user: User): Promise<BudgetCatUser | null> {
       : getLocalHouseholdId(user.id);
   } catch (error) {
     logStartupWarning("auth_init_failed", error);
+    if (hasSupabaseConfig && supabase) {
+      throw error;
+    }
     householdId = getLocalHouseholdId(user.id);
   }
 
-  return {
+  const budgetCatUser = {
     id: user.id,
     email: user.email,
     householdId,
@@ -63,6 +70,9 @@ async function toBudgetCatUser(user: User): Promise<BudgetCatUser | null> {
     fullName:
       typeof user.user_metadata?.full_name === "string" ? user.user_metadata.full_name : undefined,
   };
+
+  storeLocalUser(budgetCatUser);
+  return budgetCatUser;
 }
 
 function getStoredLocalUser() {
@@ -87,7 +97,7 @@ function createLocalUser(email: string) {
     isOffline: true,
   };
 
-  localStorage.setItem(localSessionKey, JSON.stringify(localUser));
+  storeLocalUser(localUser);
   return localUser;
 }
 
@@ -155,12 +165,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           return;
         }
 
-        const { data } = await withTimeout(
-          supabase.auth.getSession(),
+        if (!navigator.onLine) {
+          const cachedUser = getStoredLocalUser();
+          if (cachedUser?.householdId) {
+            await prepareUserData(cachedUser);
+          }
+          if (isMounted) {
+            setUser(cachedUser);
+            setIsLoading(false);
+          }
+          return;
+        }
+
+        const session = await withTimeout(
+          getSupabaseSessionOnce(),
           startupTimeoutMs,
           "supabase_session",
         );
-        const sessionUser = data.session ? await toBudgetCatUser(data.session.user) : null;
+        const sessionUser = session ? await toBudgetCatUser(session.user) : null;
         if (sessionUser) {
           await prepareUserData(sessionUser);
         }
@@ -218,20 +240,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      try {
-        const sessionUser = session ? await toBudgetCatUser(session.user) : null;
-        if (sessionUser) {
-          await prepareUserData(sessionUser);
-        }
-        setUser(sessionUser);
-        setStartupError(null);
-      } catch (error) {
-        logStartupError("auth_init_failed", error);
-        setStartupError(createStartupError("auth_init_failed"));
-      } finally {
-        setIsLoading(false);
-      }
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      window.setTimeout(() => {
+        if (!isMounted) return;
+
+        void (async () => {
+          try {
+            const sessionUser = session ? await toBudgetCatUser(session.user) : null;
+            if (sessionUser) {
+              await prepareUserData(sessionUser);
+            }
+            if (!isMounted) return;
+            setUser(sessionUser);
+            setStartupError(null);
+          } catch (error) {
+            logStartupError("auth_init_failed", error);
+            if (!isMounted) return;
+            setStartupError(createStartupError("auth_init_failed"));
+          } finally {
+            if (isMounted) {
+              setIsLoading(false);
+            }
+          }
+        })();
+      }, 0);
     });
 
     return () => {

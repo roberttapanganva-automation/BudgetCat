@@ -1,7 +1,7 @@
 import type { User } from "@supabase/supabase-js";
 import { getOrCreateHousehold } from "./household";
 import { db, markRecordSyncStatus, nowIso } from "./localDb";
-import { hasSupabaseConfig, supabase } from "./supabase";
+import { getSupabaseSessionOnce, hasSupabaseConfig, supabase } from "./supabase";
 import { setLatestSyncError } from "./syncErrorStore";
 import { setSyncStatus } from "./syncStatusStore";
 import type {
@@ -46,6 +46,11 @@ const tableOrder: SyncQueueItem["table_name"][] = [
 ];
 
 let syncRunPromise: Promise<SyncResult> | null = null;
+
+type SyncIdentity = {
+  userId: string;
+  householdId: string;
+};
 
 function devSyncLog(message: string, details?: Record<string, unknown>) {
   if (!import.meta.env.DEV) return;
@@ -192,18 +197,6 @@ function mapRemoteRecord(
   return mapRemoteGoalContribution(record, userId, householdId);
 }
 
-async function getAuthenticatedSyncUser() {
-  if (!supabase) return null;
-  const { data, error } = await supabase.auth.getSession();
-
-  if (error) {
-    console.warn("[BudgetCat Sync Warning] Could not read Supabase session", error);
-    return null;
-  }
-
-  return data.session?.user ?? null;
-}
-
 async function resolveSyncHousehold(
   sessionUser: User,
   fallbackHouseholdId?: string,
@@ -214,6 +207,40 @@ async function resolveSyncHousehold(
     console.warn("[BudgetCat Sync Warning] Could not resolve household from session", error);
     return fallbackHouseholdId ?? "";
   }
+}
+
+async function getSyncIdentity(user?: BudgetCatUser | User): Promise<SyncIdentity | null> {
+  if (user?.id && "householdId" in user && user.householdId) {
+    return {
+      userId: user.id,
+      householdId: user.householdId,
+    };
+  }
+
+  const sessionUser =
+    user?.id && !("householdId" in user)
+      ? user
+      : (await getSupabaseSessionOnce())?.user ?? null;
+
+  if (!sessionUser) {
+    return null;
+  }
+
+  const fallbackHouseholdId = user && "householdId" in user ? user.householdId : "";
+  let householdId = await resolveSyncHousehold(sessionUser, fallbackHouseholdId);
+
+  if (!householdId) {
+    householdId = fallbackHouseholdId;
+  }
+
+  if (!householdId) {
+    return null;
+  }
+
+  return {
+    userId: sessionUser.id,
+    householdId,
+  };
 }
 
 async function repairPendingGoalOwnership(userId: string, householdId: string) {
@@ -673,6 +700,62 @@ async function pullRemoteTable(
   return { fetched: remoteRecords.length, applied, skipped, latestError: null };
 }
 
+async function pullRemoteTables(
+  identity: SyncIdentity,
+  options: { manageStatus?: boolean } = {},
+): Promise<SyncResult> {
+  const manageStatus = options.manageStatus ?? true;
+
+  devSyncLog("pull started", {
+    userId: identity.userId,
+    householdId: identity.householdId,
+  });
+
+  if (manageStatus) {
+    setSyncStatus({
+      isSyncing: true,
+      currentTable: "pulling remote data",
+      syncError: null,
+    });
+  }
+
+  const results = [];
+  for (const tableName of tableOrder) {
+    setSyncStatus({ currentTable: `pull ${tableName}` });
+    results.push(await pullRemoteTable(tableName, identity.userId, identity.householdId));
+  }
+
+  const applied = results.reduce((sum, result) => sum + result.applied, 0);
+  const failed = results.filter((result) => result.latestError).length;
+  const latestError = results.find((result) => result.latestError)?.latestError ?? null;
+
+  if (failed === 0) {
+    setLatestSyncError(null);
+  }
+
+  if (manageStatus) {
+    setSyncStatus({
+      currentTable: null,
+      percentComplete: 100,
+      lastSyncedAt: failed === 0 ? new Date().toISOString() : undefined,
+      isSyncing: false,
+      syncError: latestError,
+    });
+  }
+
+  devSyncLog("pull finished", {
+    applied,
+    failed,
+  });
+
+  return {
+    ok: failed === 0,
+    synced: applied,
+    failed,
+    latestError,
+  };
+}
+
 export async function pullRemoteChanges(user?: BudgetCatUser | User): Promise<SyncResult> {
   if (!canSync()) {
     const skippedReason = navigator.onLine ? "Supabase is not configured" : "Offline mode";
@@ -686,80 +769,19 @@ export async function pullRemoteChanges(user?: BudgetCatUser | User): Promise<Sy
     };
   }
 
-  const sessionUser = await getAuthenticatedSyncUser();
-  if (!sessionUser) {
-    devSyncLog("pull skipped", { reason: "No active Supabase session" });
+  const identity = await getSyncIdentity(user);
+  if (!identity) {
+    devSyncLog("pull skipped", { reason: "Session or household not ready" });
     return {
       ok: false,
       synced: 0,
       failed: 0,
-      skippedReason: "No active Supabase session. Remote pull skipped.",
+      skippedReason: "Session or household is not ready. Remote pull skipped.",
       latestError: null,
     };
   }
 
-  const fallbackHouseholdId = user && "householdId" in user ? user.householdId : "";
-  let householdId = await resolveSyncHousehold(sessionUser, fallbackHouseholdId);
-
-  if (!householdId) {
-    householdId = fallbackHouseholdId;
-  }
-
-  if (!householdId) {
-    devSyncLog("pull skipped", { reason: "No household found" });
-    return {
-      ok: false,
-      synced: 0,
-      failed: 0,
-      skippedReason: "No household found for remote pull.",
-      latestError: null,
-    };
-  }
-
-  devSyncLog("pull started", {
-    userId: sessionUser.id,
-    householdId,
-  });
-
-  setSyncStatus({
-    isSyncing: true,
-    currentTable: "pulling remote data",
-    syncError: null,
-  });
-
-  const results = [];
-  for (const tableName of tableOrder) {
-    setSyncStatus({ currentTable: `pull ${tableName}` });
-    results.push(await pullRemoteTable(tableName, sessionUser.id, householdId));
-  }
-
-  const applied = results.reduce((sum, result) => sum + result.applied, 0);
-  const failed = results.filter((result) => result.latestError).length;
-  const latestError = results.find((result) => result.latestError)?.latestError ?? null;
-
-  if (failed === 0) {
-    setLatestSyncError(null);
-  }
-
-  setSyncStatus({
-    currentTable: null,
-    percentComplete: 100,
-    lastSyncedAt: failed === 0 ? new Date().toISOString() : undefined,
-    isSyncing: false,
-    syncError: latestError,
-  });
-
-  devSyncLog("pull finished", {
-    applied,
-    failed,
-  });
-
-  return {
-    ok: failed === 0,
-    synced: applied,
-    failed,
-    latestError,
-  };
+  return pullRemoteTables(identity);
 }
 
 export async function syncTransactions(householdId: string, batchSize = defaultBatchSize) {
@@ -782,7 +804,10 @@ export async function syncPendingRecords(
   user?: BudgetCatUser | User,
   options: { batchSize?: number } = {},
 ): Promise<SyncResult> {
-  if (syncRunPromise) return syncRunPromise;
+  if (syncRunPromise) {
+    devSyncLog("sync skipped because another sync is active");
+    return syncRunPromise;
+  }
 
   syncRunPromise = runSyncPendingRecords(user, options).finally(() => {
     syncRunPromise = null;
@@ -824,9 +849,10 @@ async function runSyncPendingRecords(
     };
   }
 
-  const sessionUser = await getAuthenticatedSyncUser();
+  const identity = await getSyncIdentity(user);
 
-  if (!sessionUser) {
+  if (!identity) {
+    devSyncLog("sync skipped", { reason: "Session or household not ready" });
     setSyncStatus({
       isSyncing: false,
       currentTable: null,
@@ -835,44 +861,35 @@ async function runSyncPendingRecords(
       ok: false,
       synced: 0,
       failed: 0,
-      skippedReason: "No active Supabase session. Local changes remain pending.",
+      skippedReason: "Session or household is not ready for sync.",
       latestError: null,
     };
   }
 
-  const fallbackHouseholdId = "householdId" in user ? user.householdId : "";
-  let householdId = await resolveSyncHousehold(sessionUser, fallbackHouseholdId);
+  await repairPendingGoalOwnership(identity.userId, identity.householdId);
 
-  if (!householdId) {
-    householdId = fallbackHouseholdId;
-  }
+  setSyncStatus({
+    totalPending: 0,
+    syncedCount: 0,
+    failedCount: 0,
+    currentTable: "pulling remote data",
+    percentComplete: 0,
+    isSyncing: true,
+    syncError: null,
+  });
 
-  if (!householdId) {
-    setSyncStatus({
-      isSyncing: false,
-      currentTable: null,
-    });
-    return {
-      ok: false,
-      synced: 0,
-      failed: 0,
-      skippedReason: "No household found for sync.",
-      latestError: null,
-    };
-  }
+  const pullResult = await pullRemoteTables(identity, { manageStatus: false });
 
-  await repairPendingGoalOwnership(sessionUser.id, householdId);
-
-  const totalPending = await getTotalPending(householdId);
-  const pendingCounts = await getPendingCountsByTable(householdId);
+  const totalPending = await getTotalPending(identity.householdId);
+  const pendingCounts = await getPendingCountsByTable(identity.householdId);
   const progress = {
     syncedCount: 0,
     failedCount: 0,
   };
 
   devSyncLog("sync started", {
-    userId: sessionUser.id,
-    householdId,
+    userId: identity.userId,
+    householdId: identity.householdId,
     pendingCounts,
   });
 
@@ -909,7 +926,7 @@ async function runSyncPendingRecords(
     results.push(
       await syncTable(
         tableName,
-        householdId,
+        identity.householdId,
         options.batchSize ?? defaultBatchSize,
         updateProgress,
       ),
@@ -925,7 +942,6 @@ async function runSyncPendingRecords(
     setLatestSyncError(null);
   }
 
-  const pullResult = await pullRemoteChanges(user);
   const totalSynced = synced + pullResult.synced;
   const totalFailed = failed + pullResult.failed;
   const combinedLatestError = latestError ?? pullResult.latestError;

@@ -149,7 +149,7 @@ export function DueDates() {
                   >
                     {bill.status === "paid" ? "Mark Unpaid" : "Mark Paid"}
                   </Button>
-                  <Button onClick={() => deleteBill(bill)} variant="ghost">
+                  <Button className="text-budget-urgent" onClick={() => deleteBill(bill)} variant="ghost">
                     Delete
                   </Button>
                 </div>

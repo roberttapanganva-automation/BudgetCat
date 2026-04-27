@@ -72,7 +72,7 @@ export async function playReminderSound(mode: ReminderSoundMode = getReminderSou
   if (mode === "off") return { ok: false, reason: "Reminder sound is off." };
 
   try {
-    return mode === "chime" ? playSoftChime() : playMeow();
+    return await (mode === "chime" ? playSoftChime() : playMeow());
   } catch {
     return { ok: false, reason: "Reminder sound could not play in this browser." };
   }

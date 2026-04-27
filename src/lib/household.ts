@@ -2,6 +2,9 @@ import type { User } from "@supabase/supabase-js";
 import { supabase } from "./supabase";
 import { setLatestSyncError } from "./syncErrorStore";
 
+const householdCache = new Map<string, string>();
+const householdRequestCache = new Map<string, Promise<string>>();
+
 function emailPrefix(email?: string | null) {
   return email?.split("@")[0] || "BudgetCat";
 }
@@ -40,7 +43,25 @@ export async function getOrCreateHousehold(user: User) {
   if (!supabase) {
     throw new Error("Supabase is not configured.");
   }
+  if (householdCache.has(user.id)) {
+    return householdCache.get(user.id) as string;
+  }
+  if (householdRequestCache.has(user.id)) {
+    return householdRequestCache.get(user.id) as Promise<string>;
+  }
 
+  const request = getOrCreateHouseholdInternal(user).finally(() => {
+    householdRequestCache.delete(user.id);
+  });
+
+  householdRequestCache.set(user.id, request);
+  return request;
+}
+
+async function getOrCreateHouseholdInternal(user: User) {
+  if (!supabase) {
+    throw new Error("Supabase is not configured.");
+  }
   const existingMembership = await supabase
     .from("household_members")
     .select("household_id")
@@ -53,7 +74,9 @@ export async function getOrCreateHousehold(user: User) {
   }
 
   if (existingMembership.data?.household_id) {
-    return existingMembership.data.household_id as string;
+    const householdId = existingMembership.data.household_id as string;
+    householdCache.set(user.id, householdId);
+    return householdId;
   }
 
   const createdHousehold = await supabase
@@ -72,18 +95,22 @@ export async function getOrCreateHousehold(user: User) {
   }
 
   const householdId = createdHousehold.data.id as string;
-  const createdMembership = await supabase.from("household_members").insert({
-    household_id: householdId,
-    user_id: user.id,
-    email: user.email,
-    role: "owner",
-    updated_at: new Date().toISOString(),
-  });
+  const createdMembership = await supabase.from("household_members").upsert(
+    {
+      household_id: householdId,
+      user_id: user.id,
+      email: user.email,
+      role: "owner",
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "household_id,user_id" },
+  );
 
   if (createdMembership.error) {
     logHouseholdError("create household membership", createdMembership.error);
     throw createdMembership.error;
   }
 
+  householdCache.set(user.id, householdId);
   return householdId;
 }
