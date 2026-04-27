@@ -118,6 +118,7 @@ export interface Reminder {
   status: ReminderStatus;
   title: string;
   body: string;
+  icon?: string;
   dueDate?: string;
   amount?: number;
   severity: "info" | "warning" | "urgent" | "success";

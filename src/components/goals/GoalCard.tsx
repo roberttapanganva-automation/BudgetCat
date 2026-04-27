@@ -73,7 +73,7 @@ export function GoalCard({
             </Button>
           )}
           {onDelete && (
-            <Button onClick={() => onDelete(goal)} variant="ghost">
+            <Button className="text-budget-urgent" onClick={() => onDelete(goal)} variant="ghost">
               Delete
             </Button>
           )}

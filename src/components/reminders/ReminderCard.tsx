@@ -11,7 +11,9 @@ const tones = {
 } as const;
 
 export function ReminderCard({ reminder }: { reminder: Reminder }) {
-  const icon = getReminderIcon(`${reminder.title} ${reminder.body} ${reminder.status} ${reminder.type}`);
+  const icon =
+    reminder.icon ??
+    getReminderIcon(`${reminder.title} ${reminder.body} ${reminder.status} ${reminder.type}`);
 
   return (
     <div className="flex items-start gap-3 rounded-lg border border-budget-border bg-budget-card p-3">

@@ -10,6 +10,7 @@ import {
   getGoalProgress,
   getSuggestedMonthlySaving,
 } from "./calculations";
+import { getGoalIcon } from "./iconMap";
 import type {
   LocalDueDate,
   LocalGoal,
@@ -82,6 +83,7 @@ export function getGoalReminders(goals: LocalGoal[], referenceDate = new Date())
       const monthsLeft = getGoalMonthsLeft(goal, referenceDate);
       const targetDate = parseISO(goal.target_date);
       const daysLeft = differenceInCalendarDays(targetDate, referenceDate);
+      const icon = getGoalIcon(goal);
 
       if (daysLeft >= 0 && daysLeft <= 30 && progress < 100) {
         reminders.push({
@@ -90,6 +92,7 @@ export function getGoalReminders(goals: LocalGoal[], referenceDate = new Date())
           status: daysLeft <= 7 ? "due_soon" : "upcoming",
           title: `${goal.title} deadline is near`,
           body: `${daysLeft} day${daysLeft === 1 ? "" : "s"} left and ${progress}% funded.`,
+          icon,
           dueDate: goal.target_date,
           severity: daysLeft <= 7 ? "warning" : "info",
           sourceId: goal.id,
@@ -105,6 +108,7 @@ export function getGoalReminders(goals: LocalGoal[], referenceDate = new Date())
             status: "upcoming",
             title: `${goal.title} may need a little push`,
             body: `Suggested monthly saving is around ${getSuggestedMonthlySaving(goal, referenceDate).toLocaleString("en-PH")} PHP.`,
+            icon,
             dueDate: goal.target_date,
             severity: "warning",
             sourceId: goal.id,

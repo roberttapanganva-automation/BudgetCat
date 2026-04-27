@@ -6,6 +6,7 @@ import { useToast } from "../../hooks/useToast";
 import { addLocalTransaction } from "../../lib/localDb";
 import { getQuickAddPresets } from "../../lib/presets";
 import { requestBackgroundSync } from "../../lib/requestBackgroundSync";
+import { playReminderSound } from "../../lib/sound";
 import { getTransactionErrorToast, getTransactionToast } from "../../lib/transactionToast";
 import type { TransactionType } from "../../types/finance";
 import { AnimatedStatusIcon } from "../ui/AnimatedStatusIcon";
@@ -70,6 +71,14 @@ export function AddTransactionDialog({
       setIsOpen(false);
       resetForm();
       showToast(getTransactionToast(savedTransaction));
+      playReminderSound()
+        .then((result) => {
+          const reason = "reason" in result ? result.reason : "";
+          if (!result.ok && reason !== "Reminder sound is off.") {
+            console.warn("[BudgetCat Sound Warning]", reason);
+          }
+        })
+        .catch(() => undefined);
       requestBackgroundSync(user, "transaction_saved");
     } catch {
       showToast(getTransactionErrorToast());
