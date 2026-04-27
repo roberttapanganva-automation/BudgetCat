@@ -42,7 +42,11 @@ export function Login() {
           <section className="p-7 sm:p-10">
             <div className="flex items-center gap-3">
               <div className="grid h-12 w-12 place-items-center rounded-lg bg-budget-primary font-display text-sm font-black text-white shadow-button">
-                BC
+                <img
+                    src="/assets/icons/budgetcat-icon.png"
+                      alt="BudgetCat"
+                     className="h-full w-full object-contain"
+                  />
               </div>
               <div>
                 <h1 className="text-2xl font-black text-budget-primary">BudgetCat</h1>
@@ -53,11 +57,11 @@ export function Login() {
             </div>
             <div className="mt-10">
               <h2 className="text-3xl font-black leading-tight sm:text-4xl">
-                Welcome back to your calm money corner.
+                Welcome back to your money corner.
               </h2>
               <p className="mt-4 max-w-md text-sm leading-6 text-budget-text/65">
                 {isSupabaseConfigured
-                  ? "Use your email and password to sync when Supabase is available."
+                  ? "Use your email and password to log in."
                   : "Supabase is not configured, so BudgetCat will run in offline-only mode."}
               </p>
             </div>
@@ -118,9 +122,6 @@ export function Login() {
                 <span className="text-budget-primary">Money</span>{" "}
                 Trail 🐾
               </h2>
-              <p className="mt-3 text-sm leading-6 text-budget-text/65">
-                Your cozy budget companions.
-              </p>
               <div className="mt-8 flex min-h-[300px] flex-1 items-end justify-center overflow-visible sm:min-h-[360px]">
                 <BudgetCatMascot
                   imageClassName="w-[min(90vw,420px)] max-w-[500px] object-contain object-bottom md:w-full"
