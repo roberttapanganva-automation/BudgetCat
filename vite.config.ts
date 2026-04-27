@@ -8,7 +8,12 @@ export default defineConfig({
     VitePWA({
       registerType: "autoUpdate",
       manifest: false,
-      includeAssets: ["icons/icon.svg", "icons/maskable.svg"],
+      includeAssets: [
+        "assets/icons/budgetcat-icon-32.png",
+        "assets/icons/budgetcat-icon-180.png",
+        "assets/icons/budgetcat-icon-192.png",
+        "assets/icons/budgetcat-icon-512.png",
+      ],
       workbox: {
         globPatterns: ["**/*.{js,css,html,svg,ico,png,webmanifest}"],
         navigateFallback: "/index.html",

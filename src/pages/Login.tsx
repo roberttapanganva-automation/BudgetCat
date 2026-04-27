@@ -45,7 +45,7 @@ export function Login() {
                 BC
               </div>
               <div>
-                <h1 className="text-2xl font-black">BudgetCat</h1>
+                <h1 className="text-2xl font-black text-budget-primary">BudgetCat</h1>
                 <p className="text-sm font-semibold text-budget-text/55">
                   Private personal finance tracker
                 </p>
@@ -112,10 +112,12 @@ export function Login() {
           </section>
           <section className="bg-budget-background p-7 sm:p-10">
             <div className="flex h-full min-h-[460px] flex-col">
-              <p className="text-sm font-black uppercase tracking-[0.14em] text-budget-cat">
-                Bonnie & Clyde
-              </p>
-              <h2 className="mt-2 text-2xl font-black">Bonnie & Clyde are ready.</h2>
+              <h2 className="text-center text-2xl font-black leading-tight sm:text-3xl">
+                <span className="text-budget-cat">Bonnie & Clyde</span>{" "}
+                Are Ready to Track Your{" "}
+                <span className="text-budget-primary">Money</span>{" "}
+                Trail 🐾
+              </h2>
               <p className="mt-3 text-sm leading-6 text-budget-text/65">
                 Your cozy budget companions.
               </p>
