@@ -26,6 +26,9 @@ registerSW({
 initPwaInstallListener();
 applyTheme(getPreferredTheme());
 
+console.info("[BOOT_TRACE] app mounted", { elapsedMs: 0 });
+console.info("[BOOT_TRACE] navigator.onLine =", navigator.onLine, { elapsedMs: 0 });
+
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <AuthProvider>

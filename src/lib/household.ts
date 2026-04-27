@@ -1,9 +1,11 @@
 import type { User } from "@supabase/supabase-js";
 import { supabase } from "./supabase";
+import { isOfflineLikeError } from "./startupDebug";
 import { setLatestSyncError } from "./syncErrorStore";
 
 const householdCache = new Map<string, string>();
 const householdRequestCache = new Map<string, Promise<string>>();
+const householdStorageKey = "budgetcat-household-cache";
 
 function emailPrefix(email?: string | null) {
   return email?.split("@")[0] || "BudgetCat";
@@ -39,6 +41,58 @@ function logHouseholdError(action: string, error: unknown) {
   });
 }
 
+function readHouseholdStorage() {
+  try {
+    const raw = localStorage.getItem(householdStorageKey);
+    return raw ? (JSON.parse(raw) as Record<string, string>) : {};
+  } catch {
+    return {};
+  }
+}
+
+function readLocalSessionHousehold(userId: string) {
+  try {
+    const raw = localStorage.getItem("budgetcat-local-session");
+    const parsed = raw ? JSON.parse(raw) : null;
+    return parsed?.id === userId && typeof parsed.householdId === "string"
+      ? parsed.householdId
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+export function getCachedHouseholdId(userId: string) {
+  if (householdCache.has(userId)) {
+    return householdCache.get(userId) as string;
+  }
+
+  const storageHouseholdId = readHouseholdStorage()[userId];
+  const sessionHouseholdId = readLocalSessionHousehold(userId);
+  const householdId = storageHouseholdId || sessionHouseholdId;
+
+  if (householdId) {
+    householdCache.set(userId, householdId);
+    return householdId;
+  }
+
+  return null;
+}
+
+export function saveCachedHouseholdId(userId: string, householdId: string) {
+  if (!userId || !householdId) return;
+
+  householdCache.set(userId, householdId);
+
+  try {
+    const storage = readHouseholdStorage();
+    storage[userId] = householdId;
+    localStorage.setItem(householdStorageKey, JSON.stringify(storage));
+  } catch {
+    // Local cache writes are best-effort; Supabase remains the source of truth online.
+  }
+}
+
 export async function getOrCreateHousehold(user: User) {
   if (!supabase) {
     throw new Error("Supabase is not configured.");
@@ -62,20 +116,42 @@ async function getOrCreateHouseholdInternal(user: User) {
   if (!supabase) {
     throw new Error("Supabase is not configured.");
   }
-  const existingMembership = await supabase
-    .from("household_members")
-    .select("household_id")
-    .eq("user_id", user.id)
-    .maybeSingle();
+  const cachedHouseholdId = getCachedHouseholdId(user.id);
+  let existingMembership;
+
+  try {
+    existingMembership = await supabase
+      .from("household_members")
+      .select("household_id")
+      .eq("user_id", user.id)
+      .maybeSingle();
+  } catch (error) {
+    if (cachedHouseholdId && isOfflineLikeError(error)) {
+      console.info("[BOOT_TRACE] household init failed but cached household fallback used", {
+        householdFound: true,
+        reason: error instanceof Error ? error.message : String(error),
+      });
+      return cachedHouseholdId;
+    }
+
+    throw error;
+  }
 
   if (existingMembership.error) {
+    if (cachedHouseholdId && isOfflineLikeError(existingMembership.error)) {
+      console.info("[BOOT_TRACE] household init failed but cached household fallback used", {
+        householdFound: true,
+        reason: existingMembership.error.message,
+      });
+      return cachedHouseholdId;
+    }
     logHouseholdError("read household membership", existingMembership.error);
     throw existingMembership.error;
   }
 
   if (existingMembership.data?.household_id) {
     const householdId = existingMembership.data.household_id as string;
-    householdCache.set(user.id, householdId);
+    saveCachedHouseholdId(user.id, householdId);
     return householdId;
   }
 
@@ -111,6 +187,6 @@ async function getOrCreateHouseholdInternal(user: User) {
     throw createdMembership.error;
   }
 
-  householdCache.set(user.id, householdId);
+  saveCachedHouseholdId(user.id, householdId);
   return householdId;
 }
