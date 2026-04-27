@@ -1,6 +1,7 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import { Navigate, Route, BrowserRouter as Router, Routes } from "react-router-dom";
+import { registerSW } from "virtual:pwa-register";
 import { ProtectedRoute } from "./components/auth/ProtectedRoute";
 import { PublicOnlyRoute } from "./components/auth/PublicOnlyRoute";
 import { AppLayout } from "./components/layout/AppLayout";
@@ -16,6 +17,10 @@ import { Transactions } from "./pages/Transactions";
 import { initPwaInstallListener } from "./lib/pwaInstall";
 import { applyTheme, getPreferredTheme } from "./lib/theme";
 import "./styles/globals.css";
+
+registerSW({
+  immediate: true,
+});
 
 initPwaInstallListener();
 applyTheme(getPreferredTheme());
