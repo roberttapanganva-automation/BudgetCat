@@ -78,11 +78,11 @@ export function AddDueDateDialog() {
         <form className="grid gap-4 sm:grid-cols-2" onSubmit={handleSubmit}>
           <label className="grid gap-2 text-sm font-bold">
             Title
-            <input className="budget-input" name="title" placeholder="Internet Bill" required />
+            <input className="budget-input" name="title" placeholder="Bill title" required />
           </label>
           <label className="grid gap-2 text-sm font-bold">
             Amount
-            <input className="budget-input" min="0" name="amount" placeholder="1699" required type="number" />
+            <input className="budget-input" min="0" name="amount" placeholder="0" required type="number" />
           </label>
           <label className="grid gap-2 text-sm font-bold">
             Due Date
