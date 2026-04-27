@@ -3,6 +3,7 @@ import ReactDOM from "react-dom/client";
 import { Navigate, Route, BrowserRouter as Router, Routes } from "react-router-dom";
 import { registerSW } from "virtual:pwa-register";
 import { ProtectedRoute } from "./components/auth/ProtectedRoute";
+import { PwaDebugPanel } from "./components/debug/PwaDebugPanel";
 import { PublicOnlyRoute } from "./components/auth/PublicOnlyRoute";
 import { AppLayout } from "./components/layout/AppLayout";
 import { ToastProvider } from "./components/ui/ToastProvider";
@@ -47,6 +48,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </Router>
+        <PwaDebugPanel />
       </ToastProvider>
     </AuthProvider>
   </React.StrictMode>,
