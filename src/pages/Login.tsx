@@ -41,13 +41,11 @@ export function Login() {
         <div className="grid md:grid-cols-[1.05fr_0.95fr]">
           <section className="p-7 sm:p-10">
             <div className="flex items-center gap-3">
-              <div className="grid h-12 w-12 place-items-center rounded-lg bg-budget-primary font-display text-sm font-black text-white shadow-button">
                 <img
                     src="/assets/icons/budgetcat-icon.png"
                       alt="BudgetCat"
-                     className="h-full w-full object-contain"
+                     className="h-12 w-12 object-contain"
                   />
-              </div>
               <div>
                 <h1 className="text-2xl font-black text-budget-primary">BudgetCat</h1>
                 <p className="text-sm font-semibold text-budget-text/55">
