@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
-import { Link, Outlet } from "react-router-dom";
+import { Link, Outlet, useLocation } from "react-router-dom";
 import { Settings } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
 import { db } from "../../lib/localDb";
@@ -13,6 +13,7 @@ import { Sidebar } from "./Sidebar";
 
 export function AppLayout() {
   const { user } = useAuth();
+  const location = useLocation();
   const householdId = user?.householdId ?? "";
   const dueDates =
     useLiveQuery(
@@ -29,15 +30,31 @@ export function AppLayout() {
   useEffect(() => {
     if (!user) return;
 
-    syncPendingRecords(user);
+    if (navigator.onLine) {
+      syncPendingRecords(user);
+    }
 
     const handleOnline = () => {
       syncPendingRecords(user);
     };
+    const handleFocus = () => {
+      if (navigator.onLine) {
+        syncPendingRecords(user);
+      }
+    };
 
     window.addEventListener("online", handleOnline);
-    return () => window.removeEventListener("online", handleOnline);
+    window.addEventListener("focus", handleFocus);
+    return () => {
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("focus", handleFocus);
+    };
   }, [user]);
+
+  useEffect(() => {
+    if (!user || !navigator.onLine) return;
+    syncPendingRecords(user);
+  }, [location.pathname, user]);
 
   useEffect(() => {
     if (!user || dueDates.length === 0) return;
