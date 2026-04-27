@@ -282,3 +282,17 @@ export async function ensureLocalDefaults(userId: string, householdId: string) {
   void householdId;
   await db.open();
 }
+
+export async function getKnownLocalHouseholdId(userId: string) {
+  await db.open();
+
+  const tables = [db.transactions, db.due_dates, db.goals, db.goal_contributions];
+  for (const table of tables) {
+    const record = await table.where("user_id").equals(userId).first();
+    if (record?.household_id) {
+      return record.household_id;
+    }
+  }
+
+  return null;
+}

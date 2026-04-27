@@ -9,7 +9,7 @@ import {
 } from "react";
 import type { AuthError, User } from "@supabase/supabase-js";
 import { getOrCreateHousehold } from "../lib/household";
-import { ensureLocalDefaults, getLocalHouseholdId } from "../lib/localDb";
+import { ensureLocalDefaults, getKnownLocalHouseholdId, getLocalHouseholdId } from "../lib/localDb";
 import { getSupabaseSessionOnce, hasSupabaseConfig, supabase } from "../lib/supabase";
 import { syncPendingRecords } from "../lib/syncEngine";
 import {
@@ -22,9 +22,17 @@ import {
 } from "../lib/startupDebug";
 import type { BudgetCatUser } from "../types/finance";
 
+type AuthBootState =
+  | "initializing"
+  | "authenticated_online"
+  | "authenticated_offline"
+  | "unauthenticated"
+  | "auth_error";
+
 type AuthContextValue = {
   user: BudgetCatUser | null;
   isLoading: boolean;
+  authBootState: AuthBootState;
   authError: string | null;
   authMessage: string | null;
   startupError: StartupErrorState | null;
@@ -41,6 +49,10 @@ const localSessionKey = "budgetcat-local-session";
 
 function storeLocalUser(user: BudgetCatUser) {
   localStorage.setItem(localSessionKey, JSON.stringify(user));
+}
+
+function logAuthBoot(message: string, details?: Record<string, unknown>) {
+  console.info(`[BudgetCat Auth Boot] ${message}`, details ?? {});
 }
 
 async function toBudgetCatUser(user: User): Promise<BudgetCatUser | null> {
@@ -83,6 +95,61 @@ function getStoredLocalUser() {
     logStartupWarning("auth_init_failed", error);
     return null;
   }
+}
+
+function getCachedSupabaseUser() {
+  try {
+    const authKey = Object.keys(localStorage).find(
+      (key) => key.startsWith("sb-") && key.endsWith("-auth-token"),
+    );
+    if (!authKey) return null;
+
+    const raw = localStorage.getItem(authKey);
+    const parsed = raw ? JSON.parse(raw) : null;
+    const user = parsed?.user ?? parsed?.currentSession?.user;
+
+    if (!user?.id || !user?.email) return null;
+
+    return {
+      id: String(user.id),
+      email: String(user.email),
+      nickname:
+        typeof user.user_metadata?.nickname === "string"
+          ? user.user_metadata.nickname
+          : undefined,
+      fullName:
+        typeof user.user_metadata?.full_name === "string"
+          ? user.user_metadata.full_name
+          : undefined,
+    };
+  } catch (error) {
+    logStartupWarning("auth_init_failed", error);
+    return null;
+  }
+}
+
+async function getOfflineCachedUser() {
+  const storedUser = getStoredLocalUser();
+  if (storedUser?.id && storedUser.householdId) return storedUser;
+
+  const cachedSupabaseUser = getCachedSupabaseUser();
+  if (!cachedSupabaseUser) return storedUser;
+
+  const knownHouseholdId = await getKnownLocalHouseholdId(cachedSupabaseUser.id);
+
+  if (storedUser?.householdId || knownHouseholdId) {
+    return {
+      ...(storedUser ?? {}),
+      id: cachedSupabaseUser.id,
+      email: cachedSupabaseUser.email,
+      householdId: storedUser?.householdId ?? knownHouseholdId ?? "",
+      isOffline: true,
+      nickname: cachedSupabaseUser.nickname ?? storedUser?.nickname,
+      fullName: cachedSupabaseUser.fullName ?? storedUser?.fullName,
+    };
+  }
+
+  return null;
 }
 
 function createLocalUser(email: string) {
@@ -140,6 +207,7 @@ function getFriendlyAuthError(error: AuthError | Error) {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<BudgetCatUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [authBootState, setAuthBootState] = useState<AuthBootState>("initializing");
   const [authError, setAuthError] = useState<string | null>(null);
   const [authMessage, setAuthMessage] = useState<string | null>(null);
   const [startupError, setStartupError] = useState<StartupErrorState | null>(null);
@@ -151,6 +219,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     async function loadSession() {
       setIsLoading(true);
       setStartupError(null);
+      setAuthBootState("initializing");
+
+      const isOnline = navigator.onLine;
+      const cachedUser = await getOfflineCachedUser();
+      logAuthBoot("start", {
+        online: isOnline,
+        cachedSessionFound: Boolean(getCachedSupabaseUser()),
+        cachedIdentityFound: Boolean(cachedUser?.id && cachedUser.householdId),
+      });
 
       try {
         if (!hasSupabaseConfig || !supabase) {
@@ -160,19 +237,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           }
           if (isMounted) {
             setUser(localUser);
+            setAuthBootState(localUser ? "authenticated_offline" : "unauthenticated");
             setIsLoading(false);
+            logAuthBoot("finish", {
+              state: localUser ? "authenticated_offline" : "unauthenticated",
+              offlineFallbackUsed: Boolean(localUser),
+            });
           }
           return;
         }
 
-        if (!navigator.onLine) {
-          const cachedUser = getStoredLocalUser();
+        if (!isOnline) {
           if (cachedUser?.householdId) {
-            await prepareUserData(cachedUser);
+            const offlineUser = { ...cachedUser, isOffline: true };
+            await prepareUserData(offlineUser);
           }
           if (isMounted) {
-            setUser(cachedUser);
+            setUser(cachedUser ? { ...cachedUser, isOffline: true } : null);
+            setAuthBootState(cachedUser ? "authenticated_offline" : "unauthenticated");
             setIsLoading(false);
+            logAuthBoot("finish", {
+              state: cachedUser ? "authenticated_offline" : "unauthenticated",
+              offlineFallbackUsed: Boolean(cachedUser),
+              householdFound: Boolean(cachedUser?.householdId),
+            });
           }
           return;
         }
@@ -188,7 +276,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
         if (isMounted) {
           setUser(sessionUser);
+          setAuthBootState(sessionUser ? "authenticated_online" : "unauthenticated");
           setIsLoading(false);
+          logAuthBoot("finish", {
+            state: sessionUser ? "authenticated_online" : "unauthenticated",
+            offlineFallbackUsed: false,
+            householdFound: Boolean(sessionUser?.householdId),
+          });
         }
       } catch (error) {
         const message = error instanceof Error ? error.message : "Startup failed.";
@@ -201,14 +295,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           logStartupError(code, error);
         }
 
-        const localUser = getStoredLocalUser();
+        const localUser = !navigator.onLine ? await getOfflineCachedUser() : getStoredLocalUser();
         if (localUser) {
           try {
-            await prepareUserData(localUser);
+            const fallbackUser = { ...localUser, isOffline: !navigator.onLine || localUser.isOffline };
+            await prepareUserData(fallbackUser);
             if (isMounted) {
-              setUser(localUser);
+              setUser(fallbackUser);
+              setAuthBootState(!navigator.onLine ? "authenticated_offline" : "authenticated_online");
               setIsLoading(false);
               setStartupError(null);
+              logAuthBoot("finish", {
+                state: !navigator.onLine ? "authenticated_offline" : "authenticated_online",
+                offlineFallbackUsed: !navigator.onLine,
+                householdFound: Boolean(fallbackUser.householdId),
+              });
             }
             return;
           } catch (localError) {
@@ -217,6 +318,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
 
         if (isMounted) {
+          setAuthBootState("auth_error");
+          logAuthBoot("finish", {
+            state: "auth_error",
+            offlineFallbackUsed: false,
+            householdFound: false,
+          });
           setStartupError(
             createStartupError(
               code,
@@ -246,16 +353,50 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         void (async () => {
           try {
+            if (!navigator.onLine) {
+              const cachedUser = await getOfflineCachedUser();
+              if (cachedUser?.householdId) {
+                const offlineUser = { ...cachedUser, isOffline: true };
+                await prepareUserData(offlineUser);
+                if (!isMounted) return;
+                setUser(offlineUser);
+                setAuthBootState("authenticated_offline");
+                setStartupError(null);
+                setIsLoading(false);
+                logAuthBoot("auth listener offline fallback", {
+                  cachedSessionFound: Boolean(getCachedSupabaseUser()),
+                  cachedIdentityFound: true,
+                  offlineFallbackUsed: true,
+                  finalState: "authenticated_offline",
+                });
+                return;
+              }
+
+              if (!isMounted) return;
+              setUser(null);
+              setAuthBootState("unauthenticated");
+              setIsLoading(false);
+              logAuthBoot("auth listener offline without cached identity", {
+                cachedSessionFound: Boolean(getCachedSupabaseUser()),
+                cachedIdentityFound: false,
+                offlineFallbackUsed: false,
+                finalState: "unauthenticated",
+              });
+              return;
+            }
+
             const sessionUser = session ? await toBudgetCatUser(session.user) : null;
             if (sessionUser) {
               await prepareUserData(sessionUser);
             }
             if (!isMounted) return;
             setUser(sessionUser);
+            setAuthBootState(sessionUser ? "authenticated_online" : "unauthenticated");
             setStartupError(null);
           } catch (error) {
             logStartupError("auth_init_failed", error);
             if (!isMounted) return;
+            setAuthBootState("auth_error");
             setStartupError(createStartupError("auth_init_failed"));
           } finally {
             if (isMounted) {
@@ -285,6 +426,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const localUser = createLocalUser(email);
       await prepareUserData(localUser);
       setUser(localUser);
+      setAuthBootState("authenticated_offline");
       return;
     }
 
@@ -298,6 +440,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (sessionUser) {
       await prepareUserData(sessionUser);
       setUser(sessionUser);
+      setAuthBootState("authenticated_online");
     }
   }, []);
 
@@ -309,6 +452,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const localUser = createLocalUser(email);
       await prepareUserData(localUser);
       setUser(localUser);
+      setAuthBootState("authenticated_offline");
       return;
     }
 
@@ -322,6 +466,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (sessionUser) {
       await prepareUserData(sessionUser);
       setUser(sessionUser);
+      setAuthBootState("authenticated_online");
       setAuthMessage("Account created and signed in.");
       return;
     }
@@ -339,6 +484,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     localStorage.removeItem(localSessionKey);
     setUser(null);
+    setAuthBootState("unauthenticated");
   }, []);
 
   const retryStartup = useCallback(() => {
@@ -349,6 +495,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     () => ({
       user,
       isLoading,
+      authBootState,
       authError,
       authMessage,
       startupError,
@@ -360,6 +507,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }),
     [
       authError,
+      authBootState,
       authMessage,
       isLoading,
       retryStartup,
