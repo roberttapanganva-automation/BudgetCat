@@ -1,23 +1,23 @@
 import { useLiveQuery } from "dexie-react-hooks";
 import { type FormEvent, useEffect, useState } from "react";
-import { CoachCard } from "../components/dashboard/CoachCard";
 import { PageHeader } from "../components/dashboard/PageHeader";
 import { AddGoalDialog } from "../components/goals/AddGoalDialog";
 import { GoalCard } from "../components/goals/GoalCard";
+import { BudgetCatMascot } from "../components/mascot/BudgetCatMascot";
 import { ReminderList } from "../components/reminders/ReminderCard";
 import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
 import { Modal } from "../components/ui/Modal";
 import { useAuth } from "../contexts/AuthContext";
-import { getBudgetCatCoachMessages } from "../lib/budgetCatCoach";
 import {
   addLocalGoalContribution,
   db,
   softDeleteLocalGoal,
   updateLocalGoal,
 } from "../lib/localDb";
+import { getMascotMood } from "../lib/mascotMood";
 import { getGoalReminders } from "../lib/reminders";
-import { syncPendingRecords } from "../lib/syncEngine";
+import { requestBackgroundSync } from "../lib/requestBackgroundSync";
 import type { GoalPriority, GoalType, LocalGoal } from "../types/finance";
 
 export function Goals() {
@@ -37,19 +37,22 @@ export function Goals() {
       [],
     ) ?? [];
   const goalReminders = getGoalReminders(goals);
-  const coachMessages = getBudgetCatCoachMessages({
-    transactions: [],
+  const mascotMood = getMascotMood({
     dueDates: [],
     goals,
+    monthlyExpenses: 0,
+    monthlyIncome: 0,
+    pendingSyncCount: 0,
+    remainingMoney: 0,
+    savings: 0,
+    transactions: [],
   });
 
   async function deleteGoal(goal: LocalGoal) {
     const confirmed = window.confirm(`Delete ${goal.title}?`);
     if (!confirmed) return;
     await softDeleteLocalGoal(goal.id);
-    if (user && navigator.onLine) {
-      await syncPendingRecords(user);
-    }
+    requestBackgroundSync(user, "goal_deleted");
   }
 
   return (
@@ -59,16 +62,39 @@ export function Goals() {
         subtitle="Long-term goals, travel plans, purchases, and emergency savings."
         title="Goals"
       />
-      <section className="mb-5 grid gap-4 lg:grid-cols-[0.9fr_1.1fr]">
-        <CoachCard message={coachMessages[0]} />
-        <div className="rounded-lg border border-budget-border bg-budget-card p-4 shadow-soft">
-          <h2 className="mb-3 text-lg font-black">Goal reminders</h2>
+      <section className="mb-5 grid gap-4 lg:grid-cols-[0.95fr_1.05fr]">
+        <Card className="p-5">
+          <div className="flex items-center justify-between gap-4">
+            <div className="min-w-0">
+              <p className="text-xs font-black uppercase tracking-[0.16em] text-budget-primary">
+                {mascotMood.iconLabel}
+              </p>
+              <h2 className="mt-2 text-xl font-black">{mascotMood.title}</h2>
+              <p className="mt-2 text-sm font-semibold leading-6 text-budget-text/65">
+                {mascotMood.message}
+              </p>
+            </div>
+            <BudgetCatMascot
+              imageClassName="w-28 object-contain"
+              variant={mascotMood.variant === "both" ? "savings" : mascotMood.variant}
+            />
+          </div>
+        </Card>
+        <Card className="p-4">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-black">Goal reminders</h2>
+              <p className="text-sm font-semibold text-budget-text/55">
+                Steady savings, calm progress.
+              </p>
+            </div>
+          </div>
           <ReminderList
             emptyText="No goal reminders right now."
             limit={4}
             reminders={goalReminders}
           />
-        </div>
+        </Card>
       </section>
       <section className="grid gap-5 lg:grid-cols-2">
         {goals.map((goal) => (
@@ -138,9 +164,7 @@ function EditGoalModal({
       note,
     });
 
-    if (user && navigator.onLine) {
-      await syncPendingRecords(user);
-    }
+    requestBackgroundSync(user, "goal_updated");
     onClose();
   }
 
@@ -266,9 +290,7 @@ function ContributionModal({
       user.householdId,
     );
 
-    if (navigator.onLine) {
-      await syncPendingRecords(user);
-    }
+    requestBackgroundSync(user, "goal_contribution_added");
     onClose();
   }
 

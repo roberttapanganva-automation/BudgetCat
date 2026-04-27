@@ -19,6 +19,7 @@ import { ReportCard } from "../components/reports/ReportCard";
 import { Card } from "../components/ui/Card";
 import { useAuth } from "../contexts/AuthContext";
 import { calculateMonthlySummary, getTopSpendingCategory } from "../lib/calculations";
+import { getTransactionIcon } from "../lib/iconMap";
 import { db } from "../lib/localDb";
 import { formatCurrency } from "../lib/utils";
 
@@ -156,7 +157,12 @@ export function Reports() {
                   key={transaction.id}
                 >
                   <div className="min-w-0">
-                    <p className="font-black">{transaction.category}</p>
+                    <p className="flex items-center gap-2 font-black">
+                      <span aria-hidden="true" className="text-lg">
+                        {getTransactionIcon(transaction)}
+                      </span>
+                      {transaction.category}
+                    </p>
                     <p className="text-xs font-semibold text-budget-text/55">
                       {format(parseISO(transaction.date), "MMM d")}
                     </p>

@@ -1,10 +1,50 @@
+import { AlertTriangle, CalendarClock, CalendarDays, CheckCircle2 } from "lucide-react";
 import { Badge } from "../ui/Badge";
+import { AnimatedStatusIcon } from "../ui/AnimatedStatusIcon";
 
 export function BillStatusBadge({ status }: { status: string }) {
   const normalized = status.toLowerCase();
-  if (normalized === "paid") return <Badge tone="success">Paid</Badge>;
-  if (normalized === "due soon") return <Badge tone="warning">Due Soon</Badge>;
-  if (normalized === "overdue") return <Badge tone="urgent">Overdue</Badge>;
-  if (normalized === "upcoming") return <Badge>Upcoming</Badge>;
+  if (normalized === "paid") {
+    return (
+      <Badge className="gap-1.5" tone="success">
+        <AnimatedStatusIcon className="h-[13px] w-[13px] text-budget-success" icon={CheckCircle2} />
+        Paid
+      </Badge>
+    );
+  }
+  if (normalized === "overdue") {
+    return (
+      <Badge className="gap-1.5" tone="urgent">
+        <AnimatedStatusIcon
+          animation="pulse"
+          className="h-[13px] w-[13px] text-budget-urgent"
+          icon={AlertTriangle}
+          label="Overdue"
+        />
+        Overdue
+      </Badge>
+    );
+  }
+  if (normalized.includes("due")) {
+    return (
+      <Badge className="gap-1.5" tone="warning">
+        <AnimatedStatusIcon
+          animation="pulse"
+          className="h-[13px] w-[13px] text-budget-warning"
+          icon={CalendarClock}
+          label="Due soon"
+        />
+        {status}
+      </Badge>
+    );
+  }
+  if (normalized === "upcoming") {
+    return (
+      <Badge className="gap-1.5">
+        <AnimatedStatusIcon className="h-[13px] w-[13px] text-budget-text/55" icon={CalendarDays} />
+        Upcoming
+      </Badge>
+    );
+  }
   return <Badge>{status}</Badge>;
 }

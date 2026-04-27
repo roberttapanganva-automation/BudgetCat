@@ -1,13 +1,7 @@
-import { AlertCircle, CalendarClock, CheckCircle2, PiggyBank, Target } from "lucide-react";
+import { CheckCircle2 } from "lucide-react";
+import { getReminderIcon } from "../../lib/iconMap";
 import type { Reminder } from "../../types/finance";
 import { Badge } from "../ui/Badge";
-
-const icons = {
-  bill: CalendarClock,
-  savings: PiggyBank,
-  goal_deadline: Target,
-  goal_pace: Target,
-};
 
 const tones = {
   info: "neutral",
@@ -17,12 +11,14 @@ const tones = {
 } as const;
 
 export function ReminderCard({ reminder }: { reminder: Reminder }) {
-  const Icon = icons[reminder.type] ?? AlertCircle;
+  const icon = getReminderIcon(`${reminder.title} ${reminder.body} ${reminder.status} ${reminder.type}`);
 
   return (
-    <div className="flex items-start gap-3 rounded-lg border border-budget-border bg-white p-3">
-      <div className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-budget-background text-budget-primary">
-        <Icon size={18} />
+    <div className="flex items-start gap-3 rounded-lg border border-budget-border bg-budget-card p-3">
+      <div className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-budget-background">
+        <span aria-hidden="true" className="text-xl leading-none">
+          {icon}
+        </span>
       </div>
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">

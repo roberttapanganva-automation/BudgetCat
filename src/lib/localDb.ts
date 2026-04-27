@@ -82,6 +82,19 @@ export async function enqueueSync(
   operation: SyncQueueItem["operation"] = "upsert",
 ) {
   const timestamp = nowIso();
+  const existing = await db.sync_queue
+    .where("[table_name+record_id]")
+    .equals([tableName, recordId])
+    .first();
+
+  if (existing?.queue_id) {
+    await db.sync_queue.update(existing.queue_id, {
+      operation,
+      sync_status: "pending",
+      updated_at: timestamp,
+    });
+    return;
+  }
 
   await db.sync_queue.add({
     table_name: tableName,

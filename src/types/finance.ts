@@ -83,6 +83,8 @@ export interface BudgetCatUser {
   email: string;
   householdId: string;
   isOffline: boolean;
+  nickname?: string;
+  fullName?: string;
 }
 
 export interface BudgetCatSyncError {

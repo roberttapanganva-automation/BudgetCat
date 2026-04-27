@@ -21,6 +21,7 @@ import { Card } from "../components/ui/Card";
 import { useAuth } from "../contexts/AuthContext";
 import { exportBudgetCatData } from "../lib/exportData";
 import { clearLocalTestData, db } from "../lib/localDb";
+import { getStoredNickname, saveNickname } from "../lib/nickname";
 import {
   getNotificationPermission,
   isNotificationSupported,
@@ -61,6 +62,8 @@ export function Settings() {
     useState<NotificationStatus>(() => getNotificationPermission());
   const [notificationMessage, setNotificationMessage] = useState<string | null>(null);
   const [exportMessage, setExportMessage] = useState<string | null>(null);
+  const [nickname, setNickname] = useState(() => getStoredNickname(user?.id));
+  const [nicknameMessage, setNicknameMessage] = useState<string | null>(null);
   const [soundMode, setSoundMode] = useState<ReminderSoundMode>(() => getReminderSoundMode());
   const [canInstallPwa, setCanInstallPwa] = useState(() => canPromptPwaInstall());
   const [pwaMessage, setPwaMessage] = useState<string | null>(null);
@@ -80,6 +83,10 @@ export function Settings() {
     window.addEventListener(syncErrorEventName, handleSyncError);
     return () => window.removeEventListener(syncErrorEventName, handleSyncError);
   }, []);
+
+  useEffect(() => {
+    setNickname(getStoredNickname(user?.id));
+  }, [user?.id]);
 
   useEffect(() => {
     return subscribeToPwaInstallPrompt(() => {
@@ -213,6 +220,15 @@ export function Settings() {
     }
   }
 
+  async function handleSaveNickname() {
+    try {
+      await saveNickname(user, nickname);
+      setNicknameMessage("Nickname saved. Bonnie and Clyde will use it on your dashboard.");
+    } catch {
+      setNicknameMessage("Nickname saved locally. Supabase metadata could not be updated.");
+    }
+  }
+
   return (
     <>
       <PageHeader
@@ -235,6 +251,28 @@ export function Settings() {
         title="Settings"
       />
       <section className="grid gap-4">
+        <Card className="p-5">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+            <div className="min-w-0 flex-1">
+              <h2 className="text-lg font-black">Nickname</h2>
+              <p className="mt-1 text-sm font-semibold text-budget-text/60">
+                This is what Bonnie and Clyde will call you.
+              </p>
+              <input
+                className="budget-input mt-4 max-w-md"
+                onChange={(event) => setNickname(event.target.value)}
+                placeholder="Robert"
+                value={nickname}
+              />
+              {nicknameMessage && (
+                <p className="mt-2 text-sm font-semibold text-budget-text/65">
+                  {nicknameMessage}
+                </p>
+              )}
+            </div>
+            <Button onClick={handleSaveNickname}>Save Nickname</Button>
+          </div>
+        </Card>
         <Card className="p-5">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>

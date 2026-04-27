@@ -1,6 +1,6 @@
 import type { User } from "@supabase/supabase-js";
 import { getOrCreateHousehold } from "./household";
-import { db, markRecordSyncStatus } from "./localDb";
+import { db, markRecordSyncStatus, nowIso } from "./localDb";
 import { hasSupabaseConfig, supabase } from "./supabase";
 import { setLatestSyncError } from "./syncErrorStore";
 import { setSyncStatus } from "./syncStatusStore";
@@ -44,6 +44,61 @@ const tableOrder: SyncQueueItem["table_name"][] = [
 ];
 
 let syncRunPromise: Promise<SyncResult> | null = null;
+
+async function getAuthenticatedSyncUser() {
+  if (!supabase) return null;
+  const { data, error } = await supabase.auth.getSession();
+
+  if (error) {
+    console.warn("[BudgetCat Sync Warning] Could not read Supabase session", error);
+    return null;
+  }
+
+  return data.session?.user ?? null;
+}
+
+async function resolveSyncHousehold(
+  sessionUser: User,
+  fallbackHouseholdId?: string,
+) {
+  try {
+    return await getOrCreateHousehold(sessionUser);
+  } catch (error) {
+    console.warn("[BudgetCat Sync Warning] Could not resolve household from session", error);
+    return fallbackHouseholdId ?? "";
+  }
+}
+
+async function repairPendingGoalOwnership(userId: string, householdId: string) {
+  if (!userId || !householdId) return;
+
+  const pendingGoals = await db.goals
+    .where("sync_status")
+    .anyOf(["pending", "failed"])
+    .toArray();
+
+  await Promise.all(
+    pendingGoals.map(async (goal) => {
+      const patch: Partial<LocalGoal> = {};
+
+      if (goal.user_id !== userId) {
+        patch.user_id = userId;
+      }
+      if (goal.household_id !== householdId) {
+        patch.household_id = householdId;
+      }
+
+      if (Object.keys(patch).length > 0) {
+        await db.goals.update(goal.id, {
+          ...patch,
+          sync_status: "pending",
+          updated_at: nowIso(),
+        });
+        await markQueueSyncStatus("goals", goal.id, "pending");
+      }
+    }),
+  );
+}
 
 function fallbackTransactionType(type: LocalTransaction["type"]) {
   return type === "income" || type === "salary" ? "income" : "expense";
@@ -436,10 +491,27 @@ async function runSyncPendingRecords(
     };
   }
 
-  let householdId = "householdId" in user ? user.householdId : "";
+  const sessionUser = await getAuthenticatedSyncUser();
 
-  if (!householdId && supabase) {
-    householdId = await getOrCreateHousehold(user as User);
+  if (!sessionUser) {
+    setSyncStatus({
+      isSyncing: false,
+      currentTable: null,
+    });
+    return {
+      ok: false,
+      synced: 0,
+      failed: 0,
+      skippedReason: "No active Supabase session. Local changes remain pending.",
+      latestError: null,
+    };
+  }
+
+  const fallbackHouseholdId = "householdId" in user ? user.householdId : "";
+  let householdId = await resolveSyncHousehold(sessionUser, fallbackHouseholdId);
+
+  if (!householdId) {
+    householdId = fallbackHouseholdId;
   }
 
   if (!householdId) {
@@ -455,6 +527,8 @@ async function runSyncPendingRecords(
       latestError: null,
     };
   }
+
+  await repairPendingGoalOwnership(sessionUser.id, householdId);
 
   const totalPending = await getTotalPending(householdId);
   const progress = {

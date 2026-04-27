@@ -2,46 +2,70 @@ import { formatISO } from "date-fns";
 import { CalendarPlus } from "lucide-react";
 import { type FormEvent, useState } from "react";
 import { useAuth } from "../../contexts/AuthContext";
+import { useToast } from "../../hooks/useToast";
 import { addLocalDueDate } from "../../lib/localDb";
-import { syncPendingRecords } from "../../lib/syncEngine";
+import { requestBackgroundSync } from "../../lib/requestBackgroundSync";
 import type { DueDateStatus, RepeatType } from "../../types/finance";
 import { Button } from "../ui/Button";
 import { Modal } from "../ui/Modal";
 
 export function AddDueDateDialog() {
   const { user } = useAuth();
+  const showToast = useToast();
   const [isOpen, setIsOpen] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [status, setStatus] = useState<DueDateStatus>("upcoming");
   const [repeatType, setRepeatType] = useState<RepeatType>("monthly");
 
+  function resetForm(form: HTMLFormElement) {
+    form.reset();
+    setStatus("upcoming");
+    setRepeatType("monthly");
+  }
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!user) return;
+    if (!user || isSaving) return;
 
     const formData = new FormData(event.currentTarget);
-    await addLocalDueDate(
-      {
-        title: String(formData.get("title") || "Untitled bill"),
-        amount: Number(formData.get("amount") || 0),
-        due_date: String(
-          formData.get("due_date") ||
-            formatISO(new Date(), { representation: "date" }),
-        ),
-        repeat_type: repeatType,
-        reminder_days: Number(formData.get("reminder_days") || 3),
-        status,
-        note: String(formData.get("note") || ""),
-      },
-      user.id,
-      user.householdId,
-    );
+    const form = event.currentTarget;
 
-    if (navigator.onLine) {
-      await syncPendingRecords(user);
+    setIsSaving(true);
+    try {
+      await addLocalDueDate(
+        {
+          title: String(formData.get("title") || "Untitled bill"),
+          amount: Number(formData.get("amount") || 0),
+          due_date: String(
+            formData.get("due_date") ||
+              formatISO(new Date(), { representation: "date" }),
+          ),
+          repeat_type: repeatType,
+          reminder_days: Number(formData.get("reminder_days") || 3),
+          status,
+          note: String(formData.get("note") || ""),
+        },
+        user.id,
+        user.householdId,
+      );
+
+      setIsOpen(false);
+      resetForm(form);
+      showToast({
+        title: "Bill added \u{1F4C5}",
+        message: "Clyde will watch the due date for you.",
+        tone: "success",
+      });
+      requestBackgroundSync(user, "due_date_saved");
+    } catch {
+      showToast({
+        title: "Save failed \u{26A0}\u{FE0F}",
+        message: "BudgetCat could not save this bill yet. Please try again.",
+        tone: "error",
+      });
+    } finally {
+      setIsSaving(false);
     }
-
-    setIsOpen(false);
-    event.currentTarget.reset();
   }
 
   return (
@@ -98,10 +122,12 @@ export function AddDueDateDialog() {
             <textarea className="budget-input min-h-24 resize-none" name="note" />
           </label>
           <div className="flex flex-col-reverse gap-3 sm:col-span-2 sm:flex-row sm:justify-end">
-            <Button onClick={() => setIsOpen(false)} variant="secondary">
+            <Button disabled={isSaving} onClick={() => setIsOpen(false)} variant="secondary">
               Cancel
             </Button>
-            <Button type="submit">Save Bill</Button>
+            <Button disabled={isSaving} type="submit">
+              {isSaving ? "Saving..." : "Save Bill"}
+            </Button>
           </div>
         </form>
       </Modal>

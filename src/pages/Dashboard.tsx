@@ -1,21 +1,15 @@
 import {
-  Banknote,
   BarChart3,
-  CalendarDays,
-  PiggyBank,
-  Target,
-  TrendingDown,
-  Wallet,
 } from "lucide-react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { format, parseISO } from "date-fns";
+import { useEffect, useState } from "react";
 import { CoachCard } from "../components/dashboard/CoachCard";
 import { MascotCard } from "../components/dashboard/MascotCard";
 import { PageHeader } from "../components/dashboard/PageHeader";
 import { PreviewPanel } from "../components/dashboard/PreviewPanel";
 import { StatCard } from "../components/dashboard/StatCard";
 import { BillStatusBadge } from "../components/due-dates/BillStatusBadge";
-import { AddTransactionDialog } from "../components/transactions/AddTransactionDialog";
 import { Badge } from "../components/ui/Badge";
 import { Progress } from "../components/ui/Progress";
 import { ReminderList } from "../components/reminders/ReminderCard";
@@ -28,12 +22,17 @@ import {
 } from "../lib/calculations";
 import { getBudgetCatCoachMessages } from "../lib/budgetCatCoach";
 import { db } from "../lib/localDb";
+import { getDueDateIcon, getGoalIcon, getTransactionIcon } from "../lib/iconMap";
+import { getDashboardMascotCheckIn } from "../lib/mascotMood";
+import { getMonthTrend } from "../lib/monthComparison";
+import { getDisplayNickname, nicknameEventName } from "../lib/nickname";
 import { getAllReminders } from "../lib/reminders";
 import { formatCurrency } from "../lib/utils";
 
 export function Dashboard() {
   const { user } = useAuth();
   const householdId = user?.householdId ?? "";
+  const [nickname, setNickname] = useState(() => getDisplayNickname(user));
   const transactions =
     useLiveQuery(
       () =>
@@ -67,26 +66,46 @@ export function Dashboard() {
       [householdId],
       [],
     ) ?? [];
+  const pendingSyncCount =
+    useLiveQuery(
+      () => db.sync_queue.where("sync_status").anyOf(["pending", "failed"]).count(),
+      [],
+      0,
+    ) ?? 0;
+
+  useEffect(() => {
+    const updateNickname = () => setNickname(getDisplayNickname(user));
+    updateNickname();
+    window.addEventListener(nicknameEventName, updateNickname);
+    return () => window.removeEventListener(nicknameEventName, updateNickname);
+  }, [user]);
 
   const summary = calculateMonthlySummary(transactions);
+  const incomeTrend = getMonthTrend(transactions, "income");
+  const expensesTrend = getMonthTrend(transactions, "expenses");
+  const savingsTrend = getMonthTrend(transactions, "savings");
   const recentTransactions = [...transactions]
     .sort((a, b) => b.date.localeCompare(a.date))
     .slice(0, 4);
   const previewGoals = [...goals].sort((a, b) => b.priority.localeCompare(a.priority)).slice(0, 2);
   const reminders = getAllReminders(dueDates, goals, transactions);
   const coachMessages = getBudgetCatCoachMessages({ transactions, dueDates, goals });
+  const mascotCheckIn = getDashboardMascotCheckIn({
+    dueDates,
+    goals,
+    monthlyExpenses: summary.expenses,
+    monthlyIncome: summary.income,
+    pendingSyncCount,
+    remainingMoney: summary.remaining,
+    savings: summary.savings,
+    transactions,
+  });
 
   return (
     <>
       <PageHeader
-        action={
-          <div className="flex flex-wrap items-center gap-3">
-            <SyncStatusIndicator />
-            <AddTransactionDialog />
-          </div>
-        }
         subtitle="A live snapshot from your local BudgetCat data."
-        title={`Good evening${user?.email ? `, ${user.email.split("@")[0]}` : ""}`}
+        title={`Good evening, ${nickname}`}
       />
       <div className="mb-4 sm:hidden">
         <SyncStatusIndicator showProgress />
@@ -94,29 +113,29 @@ export function Dashboard() {
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard
           helper="Income minus expenses and savings"
-          icon={Wallet}
+          icon="👛"
           title="Remaining Money"
           value={summary.remaining}
         />
         <StatCard
           helper="Income and salary this month"
-          icon={Banknote}
+          icon="💰"
           title="This Month Income"
-          tone="success"
+          trend={incomeTrend}
           value={summary.income}
         />
         <StatCard
           helper="Expenses recorded this month"
-          icon={TrendingDown}
+          icon="📉"
           title="This Month Expenses"
-          tone="warning"
+          trend={expensesTrend}
           value={summary.expenses}
         />
         <StatCard
           helper="Savings and goal contributions"
-          icon={PiggyBank}
+          icon="🐾"
           title="This Month Savings"
-          tone="cat"
+          trend={savingsTrend}
           value={summary.savings}
         />
       </section>
@@ -137,7 +156,7 @@ export function Dashboard() {
         </div>
       </section>
       <section className="mt-6 grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
-        <MascotCard />
+        <MascotCard checkIn={mascotCheckIn} />
         <div className="grid gap-6">
           <PreviewPanel title="Upcoming due dates" to="/due-dates">
             <div className="grid gap-3">
@@ -147,8 +166,8 @@ export function Dashboard() {
                 key={bill.id}
               >
                   <div className="flex min-w-0 items-center gap-3">
-                    <div className="grid h-10 w-10 place-items-center rounded-lg bg-budget-warning/25">
-                      <CalendarDays size={18} />
+                    <div className="grid h-10 w-10 place-items-center rounded-lg bg-budget-background text-xl">
+                      <span aria-hidden="true">{getDueDateIcon(bill)}</span>
                     </div>
                     <div className="min-w-0">
                       <p className="truncate font-black">{bill.title}</p>
@@ -173,7 +192,7 @@ export function Dashboard() {
                 <div key={goal.id}>
                   <div className="mb-2 flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2">
-                      <Target className="text-budget-primary" size={17} />
+                      <span aria-hidden="true" className="text-lg">{getGoalIcon(goal)}</span>
                       <p className="text-sm font-black">{goal.title}</p>
                     </div>
                     <Badge tone="cat">{getGoalProgress(goal)}%</Badge>
@@ -202,7 +221,12 @@ export function Dashboard() {
                 key={transaction.id}
               >
                 <div className="min-w-0">
-                  <p className="truncate font-black">{transaction.category}</p>
+                  <p className="flex items-center gap-2 truncate font-black">
+                    <span aria-hidden="true" className="text-lg">
+                      {getTransactionIcon(transaction)}
+                    </span>
+                    {transaction.category}
+                  </p>
                   <p className="text-xs font-semibold text-budget-text/55">
                     {transaction.type.replace("_", " ")} - {format(parseISO(transaction.date), "MMM d")}
                   </p>

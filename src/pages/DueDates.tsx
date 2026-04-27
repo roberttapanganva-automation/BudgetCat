@@ -1,25 +1,28 @@
 import { format, parseISO } from "date-fns";
 import { useLiveQuery } from "dexie-react-hooks";
 import { type FormEvent, useEffect, useState } from "react";
-import { CoachCard } from "../components/dashboard/CoachCard";
 import { PageHeader } from "../components/dashboard/PageHeader";
 import { AddDueDateDialog } from "../components/due-dates/AddDueDateDialog";
 import { BillStatusBadge } from "../components/due-dates/BillStatusBadge";
+import { BudgetCatMascot } from "../components/mascot/BudgetCatMascot";
 import { ReminderList } from "../components/reminders/ReminderCard";
 import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
 import { Modal } from "../components/ui/Modal";
 import { useAuth } from "../contexts/AuthContext";
-import { getBudgetCatCoachMessages } from "../lib/budgetCatCoach";
+import { useToast } from "../hooks/useToast";
 import { getDueDateStatus } from "../lib/calculations";
+import { getDueDateIcon } from "../lib/iconMap";
 import { db, softDeleteLocalDueDate, updateLocalDueDate } from "../lib/localDb";
+import { getMascotMood } from "../lib/mascotMood";
 import { getDueDateReminders } from "../lib/reminders";
-import { syncPendingRecords } from "../lib/syncEngine";
+import { requestBackgroundSync } from "../lib/requestBackgroundSync";
 import { formatCurrency } from "../lib/utils";
 import type { DueDateStatus, LocalDueDate, RepeatType } from "../types/finance";
 
 export function DueDates() {
   const { user } = useAuth();
+  const showToast = useToast();
   const householdId = user?.householdId ?? "";
   const [editingBill, setEditingBill] = useState<LocalDueDate | null>(null);
   const dueDates =
@@ -34,26 +37,34 @@ export function DueDates() {
       [],
     ) ?? [];
   const reminders = getDueDateReminders(dueDates);
-  const coachMessages = getBudgetCatCoachMessages({
-    transactions: [],
+  const mascotMood = getMascotMood({
     dueDates,
     goals: [],
+    monthlyExpenses: 0,
+    monthlyIncome: 0,
+    pendingSyncCount: 0,
+    remainingMoney: 0,
+    savings: 0,
+    transactions: [],
   });
 
   async function updateBillStatus(bill: LocalDueDate, status: DueDateStatus) {
     await updateLocalDueDate(bill.id, { status });
-    if (user && navigator.onLine) {
-      await syncPendingRecords(user);
+    if (status === "paid") {
+      showToast({
+        title: "Bill marked paid \u{2705}",
+        message: "Nice - that bill is cleared.",
+        tone: "success",
+      });
     }
+    requestBackgroundSync(user, "due_date_status_updated");
   }
 
   async function deleteBill(bill: LocalDueDate) {
     const confirmed = window.confirm(`Delete ${bill.title}?`);
     if (!confirmed) return;
     await softDeleteLocalDueDate(bill.id);
-    if (user && navigator.onLine) {
-      await syncPendingRecords(user);
-    }
+    requestBackgroundSync(user, "due_date_deleted");
   }
 
   return (
@@ -63,16 +74,40 @@ export function DueDates() {
         subtitle="Upcoming bills and in-app due date reminders."
         title="Due Dates"
       />
-      <section className="mb-5 grid gap-4 lg:grid-cols-[0.9fr_1.1fr]">
-        <CoachCard message={coachMessages[0]} />
-        <div className="rounded-lg border border-budget-border bg-budget-card p-4 shadow-soft">
-          <h2 className="mb-3 text-lg font-black">Bill reminders</h2>
+      <section className="mb-5 grid gap-4 lg:grid-cols-[0.95fr_1.05fr]">
+        <Card className="p-5">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0">
+              <p className="text-xs font-black uppercase tracking-[0.16em] text-budget-primary">
+                {mascotMood.iconLabel}
+              </p>
+              <h2 className="mt-2 text-xl font-black">{mascotMood.title}</h2>
+              <p className="mt-2 text-sm font-semibold leading-6 text-budget-text/65">
+                {mascotMood.message}
+              </p>
+            </div>
+            <BudgetCatMascot
+              className="mx-auto shrink-0 sm:mx-0"
+              imageClassName="w-40 object-contain object-center sm:w-48"
+              variant={mascotMood.variant === "both" ? "bill" : mascotMood.variant}
+            />
+          </div>
+        </Card>
+        <Card className="p-4">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-black">Bill reminders</h2>
+              <p className="text-sm font-semibold text-budget-text/55">
+                Bonnie and Clyde will nudge the urgent ones.
+              </p>
+            </div>
+          </div>
           <ReminderList
             emptyText="No bills are due soon."
             limit={4}
             reminders={reminders}
           />
-        </div>
+        </Card>
       </section>
       <section className="grid gap-4">
         {dueDates.map((bill) => (
@@ -80,7 +115,12 @@ export function DueDates() {
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <div className="flex flex-wrap items-center gap-3">
-                  <h2 className="text-xl font-black">{bill.title}</h2>
+                  <h2 className="flex items-center gap-2 text-xl font-black">
+                    <span aria-hidden="true" className="text-2xl">
+                      {getDueDateIcon(bill)}
+                    </span>
+                    {bill.title}
+                  </h2>
                   <BillStatusBadge status={bill.status} />
                   <BillStatusBadge status={getDueDateStatus(bill)} />
                 </div>
@@ -174,10 +214,8 @@ function EditDueDateModal({
       note,
     });
 
-    if (user && navigator.onLine) {
-      await syncPendingRecords(user);
-    }
     onClose();
+    requestBackgroundSync(user, "due_date_updated");
   }
 
   return (

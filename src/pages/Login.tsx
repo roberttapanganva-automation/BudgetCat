@@ -1,8 +1,9 @@
 import { LockKeyhole, UserPlus } from "lucide-react";
 import { type FormEvent, useState } from "react";
 import { useAuth } from "../contexts/AuthContext";
+import { ThemeToggle } from "../components/layout/ThemeToggle";
+import { BudgetCatMascot } from "../components/mascot/BudgetCatMascot";
 import { Button } from "../components/ui/Button";
-import { Card } from "../components/ui/Card";
 
 export function Login() {
   const { authError, authMessage, isSupabaseConfigured, signIn, signUp } = useAuth();
@@ -35,11 +36,12 @@ export function Login() {
 
   return (
     <main className="grid min-h-screen place-items-center bg-budget-background px-4 py-10 text-budget-text">
-      <div className="w-full max-w-5xl overflow-hidden rounded-xl border border-budget-border bg-white shadow-soft">
+      <ThemeToggle className="fixed right-4 top-4 z-20" />
+      <div className="w-full max-w-5xl overflow-hidden rounded-xl border border-budget-border bg-budget-card shadow-soft">
         <div className="grid md:grid-cols-[1.05fr_0.95fr]">
           <section className="p-7 sm:p-10">
             <div className="flex items-center gap-3">
-              <div className="grid h-12 w-12 place-items-center rounded-lg bg-budget-primary text-lg font-black text-white shadow-button">
+              <div className="grid h-12 w-12 place-items-center rounded-lg bg-budget-primary font-display text-sm font-black text-white shadow-button">
                 BC
               </div>
               <div>
@@ -63,7 +65,7 @@ export function Login() {
               <button
                 className={
                   mode === "login"
-                    ? "rounded-md bg-white px-4 py-2 text-sm font-black shadow-sm"
+                    ? "rounded-md bg-budget-card px-4 py-2 text-sm font-black shadow-sm"
                     : "rounded-md px-4 py-2 text-sm font-black text-budget-text/60"
                 }
                 onClick={() => setMode("login")}
@@ -74,7 +76,7 @@ export function Login() {
               <button
                 className={
                   mode === "signup"
-                    ? "rounded-md bg-white px-4 py-2 text-sm font-black shadow-sm"
+                    ? "rounded-md bg-budget-card px-4 py-2 text-sm font-black shadow-sm"
                     : "rounded-md px-4 py-2 text-sm font-black text-budget-text/60"
                 }
                 onClick={() => setMode("signup")}
@@ -109,27 +111,21 @@ export function Login() {
             </form>
           </section>
           <section className="bg-budget-background p-7 sm:p-10">
-            <Card className="h-full p-6">
-              <p className="text-sm font-black uppercase text-budget-cat">
+            <div className="flex h-full min-h-[460px] flex-col">
+              <p className="text-sm font-black uppercase tracking-[0.14em] text-budget-cat">
                 Bonnie & Clyde
               </p>
-              <h2 className="mt-2 text-2xl font-black">Mascot placeholders</h2>
+              <h2 className="mt-2 text-2xl font-black">Bonnie & Clyde are ready.</h2>
               <p className="mt-3 text-sm leading-6 text-budget-text/65">
                 Your cozy budget companions.
               </p>
-              <div className="mt-8 grid grid-cols-2 gap-4">
-                <div className="rounded-lg border border-budget-border bg-budget-background p-4 text-center">
-                  <div className="mx-auto h-28 w-28 rounded-full border-4 border-budget-border bg-white shadow-soft" />
-                  <p className="mt-4 font-black">Bonnie</p>
-                  <p className="text-xs font-semibold text-budget-text/55">White cat</p>
-                </div>
-                <div className="rounded-lg border border-budget-border bg-budget-background p-4 text-center">
-                  <div className="mx-auto h-28 w-28 rounded-full border-4 border-white bg-budget-cat shadow-soft" />
-                  <p className="mt-4 font-black">Clyde</p>
-                  <p className="text-xs font-semibold text-budget-text/55">Orange cat</p>
-                </div>
+              <div className="mt-8 flex min-h-[300px] flex-1 items-end justify-center overflow-visible sm:min-h-[360px]">
+                <BudgetCatMascot
+                  imageClassName="w-[min(90vw,420px)] max-w-[500px] object-contain object-bottom md:w-full"
+                  variant="both"
+                />
               </div>
-            </Card>
+            </div>
           </section>
         </div>
       </div>

@@ -1,11 +1,14 @@
 import { formatISO } from "date-fns";
-import { Plus } from "lucide-react";
+import { Loader2, Plus } from "lucide-react";
 import { type FormEvent, useState } from "react";
 import { useAuth } from "../../contexts/AuthContext";
+import { useToast } from "../../hooks/useToast";
 import { addLocalTransaction } from "../../lib/localDb";
 import { getQuickAddPresets } from "../../lib/presets";
-import { syncPendingRecords } from "../../lib/syncEngine";
+import { requestBackgroundSync } from "../../lib/requestBackgroundSync";
+import { getTransactionErrorToast, getTransactionToast } from "../../lib/transactionToast";
 import type { TransactionType } from "../../types/finance";
+import { AnimatedStatusIcon } from "../ui/AnimatedStatusIcon";
 import { Button } from "../ui/Button";
 import { Modal } from "../ui/Modal";
 
@@ -25,7 +28,9 @@ export function AddTransactionDialog({
   label?: string;
 }) {
   const { user } = useAuth();
+  const showToast = useToast();
   const [isOpen, setIsOpen] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [type, setType] = useState<TransactionType>("expense");
   const [amount, setAmount] = useState("");
   const [category, setCategory] = useState("");
@@ -45,27 +50,32 @@ export function AddTransactionDialog({
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!user) return;
+    if (!user || isSaving) return;
 
-    await addLocalTransaction(
-      {
-        type,
-        amount: Number(amount || 0),
-        category: category || "Uncategorized",
-        date: date || formatISO(new Date(), { representation: "date" }),
-        payment_method: paymentMethod || "Cash",
-        note,
-      },
-      user.id,
-      user.householdId,
-    );
+    setIsSaving(true);
+    try {
+      const savedTransaction = await addLocalTransaction(
+        {
+          type,
+          amount: Number(amount || 0),
+          category: category || "Uncategorized",
+          date: date || formatISO(new Date(), { representation: "date" }),
+          payment_method: paymentMethod || "Cash",
+          note,
+        },
+        user.id,
+        user.householdId,
+      );
 
-    if (navigator.onLine) {
-      await syncPendingRecords(user);
+      setIsOpen(false);
+      resetForm();
+      showToast(getTransactionToast(savedTransaction));
+      requestBackgroundSync(user, "transaction_saved");
+    } catch {
+      showToast(getTransactionErrorToast());
+    } finally {
+      setIsSaving(false);
     }
-
-    setIsOpen(false);
-    resetForm();
   }
 
   return (
@@ -88,6 +98,7 @@ export function AddTransactionDialog({
               <button
                 className="shrink-0 rounded-full border border-budget-border bg-budget-background px-3 py-2 text-xs font-black text-budget-text transition hover:border-budget-primary hover:text-budget-primary"
                 key={preset.id}
+                disabled={isSaving}
                 onClick={() => {
                   setType(preset.type);
                   setAmount(String(preset.amount));
@@ -167,10 +178,20 @@ export function AddTransactionDialog({
             />
           </label>
           <div className="flex flex-col-reverse gap-3 sm:col-span-2 sm:flex-row sm:justify-end">
-            <Button onClick={() => setIsOpen(false)} variant="secondary">
+            <Button disabled={isSaving} onClick={() => setIsOpen(false)} variant="secondary">
               Cancel
             </Button>
-            <Button type="submit">Save Transaction</Button>
+            <Button disabled={isSaving} type="submit">
+              {isSaving && (
+                <AnimatedStatusIcon
+                  animation="spin"
+                  className="text-current"
+                  icon={Loader2}
+                  label="Saving transaction"
+                />
+              )}
+              {isSaving ? "Saving..." : "Save Transaction"}
+            </Button>
           </div>
         </form>
       </Modal>

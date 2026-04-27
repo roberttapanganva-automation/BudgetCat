@@ -1,26 +1,25 @@
-import { type LucideIcon } from "lucide-react";
 import { Card } from "../ui/Card";
 import { cn, formatCurrency } from "../../lib/utils";
+import type { MonthTrend } from "../../lib/monthComparison";
 
 export function StatCard({
   title,
   value,
   helper,
-  icon: Icon,
-  tone = "primary",
+  icon,
+  trend,
 }: {
   title: string;
   value: number;
   helper: string;
-  icon: LucideIcon;
-  tone?: "primary" | "success" | "warning" | "cat";
+  icon: string;
+  trend?: MonthTrend;
 }) {
-  const toneClass = {
-    primary: "bg-budget-primary/14 text-budget-primary",
-    success: "bg-budget-success/14 text-budget-success",
-    warning: "bg-budget-warning/24 text-budget-text",
-    cat: "bg-budget-cat/18 text-budget-text",
-  }[tone];
+  const trendClass = {
+    positive: "text-emerald-700 dark:text-emerald-400",
+    negative: "text-red-700 dark:text-red-400",
+    neutral: "text-budget-text/55",
+  }[trend?.tone ?? "neutral"];
 
   return (
     <Card className="relative min-w-0 overflow-hidden p-4">
@@ -32,11 +31,18 @@ export function StatCard({
             {formatCurrency(value)}
           </p>
         </div>
-        <div className={cn("grid h-11 w-11 shrink-0 place-items-center rounded-lg", toneClass)}>
-          <Icon size={21} />
+        <div className="grid h-11 w-11 shrink-0 place-items-center rounded-lg bg-budget-background">
+          <span aria-hidden="true" className="text-2xl leading-none">
+            {icon}
+          </span>
         </div>
       </div>
       <p className="mt-4 text-xs font-semibold text-budget-text/50">{helper}</p>
+      {trend && (
+        <p className={cn("mt-2 text-xs font-semibold", trendClass)}>
+          {trend.label}
+        </p>
+      )}
     </Card>
   );
 }

@@ -1,16 +1,19 @@
 import { endOfMonth, format, isWithinInterval, parseISO, startOfMonth, subMonths } from "date-fns";
 import { useLiveQuery } from "dexie-react-hooks";
-import { Pencil, Search, Trash2 } from "lucide-react";
+import { Loader2, Pencil, Search, Trash2 } from "lucide-react";
 import { type FormEvent, useEffect, useMemo, useState } from "react";
 import { PageHeader } from "../components/dashboard/PageHeader";
-import { AddTransactionDialog } from "../components/transactions/AddTransactionDialog";
+import { AnimatedStatusIcon } from "../components/ui/AnimatedStatusIcon";
 import { Badge } from "../components/ui/Badge";
 import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
 import { Modal } from "../components/ui/Modal";
 import { useAuth } from "../contexts/AuthContext";
+import { useToast } from "../hooks/useToast";
+import { getTransactionIcon } from "../lib/iconMap";
 import { db, softDeleteLocalTransaction, updateLocalTransaction } from "../lib/localDb";
-import { syncPendingRecords } from "../lib/syncEngine";
+import { requestBackgroundSync } from "../lib/requestBackgroundSync";
+import { getTransactionErrorToast, getTransactionToast } from "../lib/transactionToast";
 import { formatCurrency } from "../lib/utils";
 import type { LocalTransaction, TransactionType } from "../types/finance";
 
@@ -75,7 +78,6 @@ export function Transactions() {
   return (
     <>
       <PageHeader
-        action={<AddTransactionDialog />}
         subtitle="Manual entries are saved locally first and synced when available."
         title="Transactions"
       />
@@ -136,6 +138,9 @@ export function Transactions() {
               >
                 <div>
                   <p className="flex items-center gap-2 font-black">
+                    <span aria-hidden="true" className="text-xl">
+                      {getTransactionIcon(transaction)}
+                    </span>
                     {typeLabels[transaction.type]}
                     <Pencil className="text-budget-text/35" size={14} />
                   </p>
@@ -193,6 +198,8 @@ function EditTransactionModal({
   const [date, setDate] = useState("");
   const [paymentMethod, setPaymentMethod] = useState("");
   const [note, setNote] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
+  const showToast = useToast();
 
   useEffect(() => {
     if (!transaction) return;
@@ -206,22 +213,37 @@ function EditTransactionModal({
 
   async function handleSave(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!transaction) return;
+    if (!transaction || isSaving) return;
 
-    await updateLocalTransaction(transaction.id, {
-      type,
-      amount: Number(amount || 0),
-      category: category || "Uncategorized",
-      date,
-      payment_method: paymentMethod || "Cash",
-      note,
-    });
+    setIsSaving(true);
+    try {
+      const updatedTransaction = {
+        ...transaction,
+        type,
+        amount: Number(amount || 0),
+        category: category || "Uncategorized",
+        date,
+        payment_method: paymentMethod || "Cash",
+        note,
+      };
 
-    if (user && navigator.onLine) {
-      await syncPendingRecords(user);
+      await updateLocalTransaction(transaction.id, {
+        type,
+        amount: updatedTransaction.amount,
+        category: updatedTransaction.category,
+        date,
+        payment_method: updatedTransaction.payment_method,
+        note,
+      });
+
+      onClose();
+      showToast(getTransactionToast(updatedTransaction));
+      requestBackgroundSync(user, "transaction_updated");
+    } catch {
+      showToast(getTransactionErrorToast());
+    } finally {
+      setIsSaving(false);
     }
-
-    onClose();
   }
 
   async function handleDelete() {
@@ -230,9 +252,7 @@ function EditTransactionModal({
     if (!confirmed) return;
 
     await softDeleteLocalTransaction(transaction.id);
-    if (user && navigator.onLine) {
-      await syncPendingRecords(user);
-    }
+    requestBackgroundSync(user, "transaction_deleted");
     onClose();
   }
 
@@ -298,15 +318,25 @@ function EditTransactionModal({
           />
         </label>
         <div className="flex flex-col-reverse gap-3 sm:col-span-2 sm:flex-row sm:justify-between">
-          <Button onClick={handleDelete} type="button" variant="urgent">
+          <Button disabled={isSaving} onClick={handleDelete} type="button" variant="urgent">
             <Trash2 size={18} />
             Delete
           </Button>
           <div className="flex flex-col-reverse gap-3 sm:flex-row">
-            <Button onClick={onClose} type="button" variant="secondary">
+            <Button disabled={isSaving} onClick={onClose} type="button" variant="secondary">
               Cancel
             </Button>
-            <Button type="submit">Save Changes</Button>
+            <Button disabled={isSaving} type="submit">
+              {isSaving && (
+                <AnimatedStatusIcon
+                  animation="spin"
+                  className="text-current"
+                  icon={Loader2}
+                  label="Saving transaction"
+                />
+              )}
+              {isSaving ? "Saving..." : "Save Changes"}
+            </Button>
           </div>
         </div>
       </form>

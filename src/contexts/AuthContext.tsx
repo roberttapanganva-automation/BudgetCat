@@ -12,6 +12,14 @@ import { getOrCreateHousehold } from "../lib/household";
 import { ensureLocalDefaults, getLocalHouseholdId } from "../lib/localDb";
 import { hasSupabaseConfig, supabase } from "../lib/supabase";
 import { syncPendingRecords } from "../lib/syncEngine";
+import {
+  createStartupError,
+  logStartupError,
+  logStartupWarning,
+  startupTimeoutMs,
+  type StartupErrorState,
+  withTimeout,
+} from "../lib/startupDebug";
 import type { BudgetCatUser } from "../types/finance";
 
 type AuthContextValue = {
@@ -19,7 +27,9 @@ type AuthContextValue = {
   isLoading: boolean;
   authError: string | null;
   authMessage: string | null;
+  startupError: StartupErrorState | null;
   isSupabaseConfigured: boolean;
+  retryStartup: () => void;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
@@ -36,10 +46,11 @@ async function toBudgetCatUser(user: User): Promise<BudgetCatUser | null> {
 
   try {
     householdId = hasSupabaseConfig && supabase
-      ? await getOrCreateHousehold(user)
+      ? await withTimeout(getOrCreateHousehold(user), 6000, "household_init")
       : getLocalHouseholdId(user.id);
   } catch (error) {
-    console.error("[BudgetCat Auth Error]", error);
+    logStartupWarning("auth_init_failed", error);
+    householdId = getLocalHouseholdId(user.id);
   }
 
   return {
@@ -47,12 +58,21 @@ async function toBudgetCatUser(user: User): Promise<BudgetCatUser | null> {
     email: user.email,
     householdId,
     isOffline: !hasSupabaseConfig,
+    nickname:
+      typeof user.user_metadata?.nickname === "string" ? user.user_metadata.nickname : undefined,
+    fullName:
+      typeof user.user_metadata?.full_name === "string" ? user.user_metadata.full_name : undefined,
   };
 }
 
 function getStoredLocalUser() {
-  const raw = localStorage.getItem(localSessionKey);
-  return raw ? (JSON.parse(raw) as BudgetCatUser) : null;
+  try {
+    const raw = localStorage.getItem(localSessionKey);
+    return raw ? (JSON.parse(raw) as BudgetCatUser) : null;
+  } catch (error) {
+    logStartupWarning("auth_init_failed", error);
+    return null;
+  }
 }
 
 function createLocalUser(email: string) {
@@ -73,8 +93,15 @@ function createLocalUser(email: string) {
 
 async function prepareUserData(user: BudgetCatUser) {
   if (!user.householdId) return;
-  await ensureLocalDefaults(user.id, user.householdId);
-  await syncPendingRecords(user);
+  await withTimeout(
+    ensureLocalDefaults(user.id, user.householdId),
+    startupTimeoutMs,
+    "dexie_open",
+  );
+
+  syncPendingRecords(user).catch((error) => {
+    logStartupWarning("sync_init_failed", error);
+  });
 }
 
 function getFriendlyAuthError(error: AuthError | Error) {
@@ -105,31 +132,79 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const [authError, setAuthError] = useState<string | null>(null);
   const [authMessage, setAuthMessage] = useState<string | null>(null);
+  const [startupError, setStartupError] = useState<StartupErrorState | null>(null);
+  const [startupAttempt, setStartupAttempt] = useState(0);
 
   useEffect(() => {
     let isMounted = true;
 
     async function loadSession() {
-      if (!hasSupabaseConfig || !supabase) {
-        const localUser = getStoredLocalUser();
-        if (localUser) {
-          await prepareUserData(localUser);
+      setIsLoading(true);
+      setStartupError(null);
+
+      try {
+        if (!hasSupabaseConfig || !supabase) {
+          const localUser = getStoredLocalUser();
+          if (localUser) {
+            await prepareUserData(localUser);
+          }
+          if (isMounted) {
+            setUser(localUser);
+            setIsLoading(false);
+          }
+          return;
+        }
+
+        const { data } = await withTimeout(
+          supabase.auth.getSession(),
+          startupTimeoutMs,
+          "supabase_session",
+        );
+        const sessionUser = data.session ? await toBudgetCatUser(data.session.user) : null;
+        if (sessionUser) {
+          await prepareUserData(sessionUser);
         }
         if (isMounted) {
-          setUser(localUser);
+          setUser(sessionUser);
           setIsLoading(false);
         }
-        return;
-      }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Startup failed.";
+        const isSupabaseTimeout = message.toLowerCase().includes("supabase_session");
+        const code = isSupabaseTimeout ? "supabase_session_timeout" : "auth_init_failed";
 
-      const { data } = await supabase.auth.getSession();
-      const sessionUser = data.session ? await toBudgetCatUser(data.session.user) : null;
-      if (sessionUser) {
-        await prepareUserData(sessionUser);
-      }
-      if (isMounted) {
-        setUser(sessionUser);
-        setIsLoading(false);
+        if (code === "supabase_session_timeout") {
+          logStartupWarning(code, error);
+        } else {
+          logStartupError(code, error);
+        }
+
+        const localUser = getStoredLocalUser();
+        if (localUser) {
+          try {
+            await prepareUserData(localUser);
+            if (isMounted) {
+              setUser(localUser);
+              setIsLoading(false);
+              setStartupError(null);
+            }
+            return;
+          } catch (localError) {
+            logStartupError("dexie_open_failed", localError);
+          }
+        }
+
+        if (isMounted) {
+          setStartupError(
+            createStartupError(
+              code,
+              code === "supabase_session_timeout"
+                ? "Supabase took too long to respond. BudgetCat stopped waiting so you are not stuck on loading."
+                : "BudgetCat could not finish startup. Your local data may still be safe.",
+            ),
+          );
+          setIsLoading(false);
+        }
       }
     }
 
@@ -144,19 +219,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      const sessionUser = session ? await toBudgetCatUser(session.user) : null;
-      if (sessionUser) {
-        await prepareUserData(sessionUser);
+      try {
+        const sessionUser = session ? await toBudgetCatUser(session.user) : null;
+        if (sessionUser) {
+          await prepareUserData(sessionUser);
+        }
+        setUser(sessionUser);
+        setStartupError(null);
+      } catch (error) {
+        logStartupError("auth_init_failed", error);
+        setStartupError(createStartupError("auth_init_failed"));
+      } finally {
+        setIsLoading(false);
       }
-      setUser(sessionUser);
-      setIsLoading(false);
     });
 
     return () => {
       isMounted = false;
       subscription.unsubscribe();
     };
-  }, []);
+  }, [startupAttempt]);
 
   const handleAuthError = (error: AuthError | Error) => {
     setAuthError(getFriendlyAuthError(error));
@@ -227,18 +309,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
   }, []);
 
+  const retryStartup = useCallback(() => {
+    setStartupAttempt((attempt) => attempt + 1);
+  }, []);
+
   const value = useMemo(
     () => ({
       user,
       isLoading,
       authError,
       authMessage,
+      startupError,
       isSupabaseConfigured: hasSupabaseConfig,
+      retryStartup,
       signIn,
       signUp,
       signOut,
     }),
-    [authError, authMessage, isLoading, signIn, signOut, signUp, user],
+    [
+      authError,
+      authMessage,
+      isLoading,
+      retryStartup,
+      signIn,
+      signOut,
+      signUp,
+      startupError,
+      user,
+    ],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
