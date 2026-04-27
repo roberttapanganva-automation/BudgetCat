@@ -52,7 +52,7 @@ export function AddGoalDialog() {
         <form className="grid gap-4 sm:grid-cols-2" onSubmit={handleSubmit}>
           <label className="grid gap-2 text-sm font-bold">
             Title
-            <input className="budget-input" name="title" placeholder="Japan Travel Fund" required />
+            <input className="budget-input" name="title" placeholder="Goal title" required />
           </label>
           <label className="grid gap-2 text-sm font-bold">
             Goal Type
