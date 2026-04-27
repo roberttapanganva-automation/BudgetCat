@@ -15,6 +15,8 @@ import type {
 } from "../types/finance";
 
 type SupabasePayload = Record<string, string | number | number[] | null>;
+type RemoteRecord = Record<string, unknown>;
+type PullTableName = SyncQueueItem["table_name"];
 
 type SyncResult = {
   ok: boolean;
@@ -44,6 +46,151 @@ const tableOrder: SyncQueueItem["table_name"][] = [
 ];
 
 let syncRunPromise: Promise<SyncResult> | null = null;
+
+function devSyncLog(message: string, details?: Record<string, unknown>) {
+  if (!import.meta.env.DEV) return;
+  if (details) {
+    console.info(`[BudgetCat Sync] ${message}`, details);
+  } else {
+    console.info(`[BudgetCat Sync] ${message}`);
+  }
+}
+
+function toIso(value: unknown, fallback = nowIso()) {
+  return typeof value === "string" && value ? value : fallback;
+}
+
+function toStringValue(value: unknown, fallback = "") {
+  return typeof value === "string" && value ? value : fallback;
+}
+
+function toNullableString(value: unknown) {
+  return typeof value === "string" && value ? value : null;
+}
+
+function toNumberValue(value: unknown, fallback = 0) {
+  if (typeof value === "number") return value;
+  if (typeof value === "string" && value.trim() !== "") {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : fallback;
+  }
+  return fallback;
+}
+
+function toReminderDays(value: unknown) {
+  if (Array.isArray(value)) {
+    return toNumberValue(value[0], 0);
+  }
+  return toNumberValue(value, 0);
+}
+
+function remoteUpdatedAt(record: RemoteRecord) {
+  return toIso(record.updated_at, toIso(record.created_at));
+}
+
+function canApplyRemote(local: LocalTransaction | LocalDueDate | LocalGoal | LocalGoalContribution | undefined, remote: RemoteRecord) {
+  if (!local) return true;
+
+  const remoteTimestamp = Date.parse(remoteUpdatedAt(remote));
+  const localTimestamp = Date.parse(local.updated_at || local.created_at);
+  const remoteIsNewer =
+    Number.isFinite(remoteTimestamp) &&
+    (!Number.isFinite(localTimestamp) || remoteTimestamp > localTimestamp);
+
+  if ((local.sync_status === "pending" || local.sync_status === "failed") && !remoteIsNewer) {
+    return false;
+  }
+
+  return remoteIsNewer;
+}
+
+function mapRemoteTransaction(record: RemoteRecord, userId: string, householdId: string): LocalTransaction {
+  const type = toStringValue(record.type, "expense") as LocalTransaction["type"];
+  const date = toStringValue(record.date, toStringValue(record.transaction_date, new Date().toISOString().slice(0, 10)));
+
+  return {
+    id: toStringValue(record.id),
+    household_id: toStringValue(record.household_id, householdId),
+    user_id: toStringValue(record.user_id, userId),
+    type,
+    amount: toNumberValue(record.amount),
+    category: toStringValue(record.category, toStringValue(record.title, "Uncategorized")),
+    date,
+    payment_method: toStringValue(record.payment_method, "Cash"),
+    note: toStringValue(record.note, toStringValue(record.notes, "")),
+    sync_status: "synced",
+    created_at: toIso(record.created_at),
+    updated_at: remoteUpdatedAt(record),
+    deleted_at: toNullableString(record.deleted_at),
+  };
+}
+
+function mapRemoteDueDate(record: RemoteRecord, userId: string, householdId: string): LocalDueDate {
+  return {
+    id: toStringValue(record.id),
+    household_id: toStringValue(record.household_id, householdId),
+    user_id: toStringValue(record.user_id, userId),
+    title: toStringValue(record.title, "Untitled bill"),
+    amount: toNumberValue(record.amount),
+    due_date: toStringValue(record.due_date, new Date().toISOString().slice(0, 10)),
+    repeat_type: toStringValue(record.repeat_type, "none") as LocalDueDate["repeat_type"],
+    reminder_days: toReminderDays(record.reminder_days),
+    status: toStringValue(record.status, "upcoming") as LocalDueDate["status"],
+    note: toStringValue(record.note, toStringValue(record.notes, "")),
+    sync_status: "synced",
+    created_at: toIso(record.created_at),
+    updated_at: remoteUpdatedAt(record),
+    deleted_at: toNullableString(record.deleted_at),
+  };
+}
+
+function mapRemoteGoal(record: RemoteRecord, userId: string, householdId: string): LocalGoal {
+  return {
+    id: toStringValue(record.id),
+    household_id: toStringValue(record.household_id, householdId),
+    user_id: toStringValue(record.user_id, userId),
+    type: toStringValue(record.type, toStringValue(record.goal_type, "savings")) as LocalGoal["type"],
+    title: toStringValue(record.title, "Untitled goal"),
+    target_amount: toNumberValue(record.target_amount),
+    current_amount: toNumberValue(record.current_amount),
+    target_date: toStringValue(record.target_date, new Date().toISOString().slice(0, 10)),
+    priority: toStringValue(record.priority, "medium") as LocalGoal["priority"],
+    status: toStringValue(record.status, "active") as LocalGoal["status"],
+    note: toStringValue(record.note, toStringValue(record.notes, "")),
+    sync_status: "synced",
+    created_at: toIso(record.created_at),
+    updated_at: remoteUpdatedAt(record),
+    deleted_at: toNullableString(record.deleted_at),
+  };
+}
+
+function mapRemoteGoalContribution(record: RemoteRecord, userId: string, householdId: string): LocalGoalContribution {
+  return {
+    id: toStringValue(record.id),
+    household_id: toStringValue(record.household_id, householdId),
+    user_id: toStringValue(record.user_id, userId),
+    goal_id: toStringValue(record.goal_id),
+    amount: toNumberValue(record.amount),
+    date: toStringValue(record.date, toStringValue(record.contribution_date, new Date().toISOString().slice(0, 10))),
+    note: toStringValue(record.note, toStringValue(record.notes, "")),
+    sync_status: "synced",
+    created_at: toIso(record.created_at),
+    updated_at: remoteUpdatedAt(record),
+    deleted_at: toNullableString(record.deleted_at),
+  };
+}
+
+function mapRemoteRecord(
+  tableName: PullTableName,
+  record: RemoteRecord,
+  userId: string,
+  householdId: string,
+) {
+  if (tableName === "transactions") return mapRemoteTransaction(record, userId, householdId);
+  if (tableName === "due_dates") return mapRemoteDueDate(record, userId, householdId);
+  if (tableName === "goals") return mapRemoteGoal(record, userId, householdId);
+  return mapRemoteGoalContribution(record, userId, householdId);
+}
 
 async function getAuthenticatedSyncUser() {
   if (!supabase) return null;
@@ -400,6 +547,23 @@ async function getTotalPending(householdId: string) {
   return totals.reduce((sum, count) => sum + count, 0);
 }
 
+async function getPendingCountsByTable(householdId: string) {
+  const counts = await Promise.all(
+    tableOrder.map(async (tableName) => {
+      const count = await db
+        .table(tableName)
+        .where("sync_status")
+        .anyOf(["pending", "failed"])
+        .filter((record) => record.household_id === householdId)
+        .count();
+
+      return [tableName, count] as const;
+    }),
+  );
+
+  return Object.fromEntries(counts);
+}
+
 async function syncTable(
   tableName: SyncQueueItem["table_name"],
   householdId: string,
@@ -427,6 +591,175 @@ async function syncTable(
   }
 
   return { synced, failed, latestError };
+}
+
+async function pullRemoteTable(
+  tableName: PullTableName,
+  userId: string,
+  householdId: string,
+) {
+  if (!supabase) {
+    return { fetched: 0, applied: 0, skipped: 0, latestError: null as BudgetCatSyncError | null };
+  }
+
+  const { data, error } = await supabase
+    .from(tableName)
+    .select("*")
+    .eq("household_id", householdId)
+    .order("updated_at", { ascending: true });
+
+  if (error) {
+    const latestError: BudgetCatSyncError = {
+      tableName,
+      action: "pull",
+      message: error.message,
+      details: error.details,
+      hint: error.hint,
+      code: error.code,
+      createdAt: new Date().toISOString(),
+    };
+
+    console.error("[BudgetCat Sync Error]", {
+      tableName,
+      action: "pull",
+      message: error.message,
+      details: error.details,
+      hint: error.hint,
+      code: error.code,
+    });
+    setLatestSyncError(latestError);
+    return { fetched: 0, applied: 0, skipped: 0, latestError };
+  }
+
+  const remoteRecords = (data ?? []) as RemoteRecord[];
+  let applied = 0;
+  let skipped = 0;
+
+  await db.transaction("rw", db.table(tableName), db.sync_queue, async () => {
+    for (const remoteRecord of remoteRecords) {
+      const recordId = toStringValue(remoteRecord.id);
+      if (!recordId) {
+        skipped += 1;
+        continue;
+      }
+
+      const localRecord = await db.table(tableName).get(recordId) as
+        | LocalTransaction
+        | LocalDueDate
+        | LocalGoal
+        | LocalGoalContribution
+        | undefined;
+
+      if (!canApplyRemote(localRecord, remoteRecord)) {
+        skipped += 1;
+        continue;
+      }
+
+      const normalizedRecord = mapRemoteRecord(tableName, remoteRecord, userId, householdId);
+      await db.table(tableName).put(normalizedRecord);
+      await markQueueSyncStatus(tableName, recordId, "synced");
+      applied += 1;
+    }
+  });
+
+  devSyncLog("remote records fetched", {
+    tableName,
+    fetched: remoteRecords.length,
+    applied,
+    skipped,
+    softDeleted: remoteRecords.filter((record) => Boolean(record.deleted_at)).length,
+  });
+
+  return { fetched: remoteRecords.length, applied, skipped, latestError: null };
+}
+
+export async function pullRemoteChanges(user?: BudgetCatUser | User): Promise<SyncResult> {
+  if (!canSync()) {
+    const skippedReason = navigator.onLine ? "Supabase is not configured" : "Offline mode";
+    devSyncLog("pull skipped", { reason: skippedReason });
+    return {
+      ok: false,
+      synced: 0,
+      failed: 0,
+      skippedReason,
+      latestError: null,
+    };
+  }
+
+  const sessionUser = await getAuthenticatedSyncUser();
+  if (!sessionUser) {
+    devSyncLog("pull skipped", { reason: "No active Supabase session" });
+    return {
+      ok: false,
+      synced: 0,
+      failed: 0,
+      skippedReason: "No active Supabase session. Remote pull skipped.",
+      latestError: null,
+    };
+  }
+
+  const fallbackHouseholdId = user && "householdId" in user ? user.householdId : "";
+  let householdId = await resolveSyncHousehold(sessionUser, fallbackHouseholdId);
+
+  if (!householdId) {
+    householdId = fallbackHouseholdId;
+  }
+
+  if (!householdId) {
+    devSyncLog("pull skipped", { reason: "No household found" });
+    return {
+      ok: false,
+      synced: 0,
+      failed: 0,
+      skippedReason: "No household found for remote pull.",
+      latestError: null,
+    };
+  }
+
+  devSyncLog("pull started", {
+    userId: sessionUser.id,
+    householdId,
+  });
+
+  setSyncStatus({
+    isSyncing: true,
+    currentTable: "pulling remote data",
+    syncError: null,
+  });
+
+  const results = [];
+  for (const tableName of tableOrder) {
+    setSyncStatus({ currentTable: `pull ${tableName}` });
+    results.push(await pullRemoteTable(tableName, sessionUser.id, householdId));
+  }
+
+  const applied = results.reduce((sum, result) => sum + result.applied, 0);
+  const failed = results.filter((result) => result.latestError).length;
+  const latestError = results.find((result) => result.latestError)?.latestError ?? null;
+
+  if (failed === 0) {
+    setLatestSyncError(null);
+  }
+
+  setSyncStatus({
+    currentTable: null,
+    percentComplete: 100,
+    lastSyncedAt: failed === 0 ? new Date().toISOString() : undefined,
+    isSyncing: false,
+    syncError: latestError,
+  });
+
+  devSyncLog("pull finished", {
+    applied,
+    failed,
+  });
+
+  return {
+    ok: failed === 0,
+    synced: applied,
+    failed,
+    latestError,
+  };
 }
 
 export async function syncTransactions(householdId: string, batchSize = defaultBatchSize) {
@@ -531,10 +864,17 @@ async function runSyncPendingRecords(
   await repairPendingGoalOwnership(sessionUser.id, householdId);
 
   const totalPending = await getTotalPending(householdId);
+  const pendingCounts = await getPendingCountsByTable(householdId);
   const progress = {
     syncedCount: 0,
     failedCount: 0,
   };
+
+  devSyncLog("sync started", {
+    userId: sessionUser.id,
+    householdId,
+    pendingCounts,
+  });
 
   setSyncStatus({
     totalPending,
@@ -585,21 +925,32 @@ async function runSyncPendingRecords(
     setLatestSyncError(null);
   }
 
+  const pullResult = await pullRemoteChanges(user);
+  const totalSynced = synced + pullResult.synced;
+  const totalFailed = failed + pullResult.failed;
+  const combinedLatestError = latestError ?? pullResult.latestError;
+
   setSyncStatus({
     totalPending,
-    syncedCount: synced,
-    failedCount: failed,
+    syncedCount: totalSynced,
+    failedCount: totalFailed,
     currentTable: null,
     percentComplete: 100,
-    lastSyncedAt: failed === 0 ? new Date().toISOString() : undefined,
+    lastSyncedAt: totalFailed === 0 ? new Date().toISOString() : undefined,
     isSyncing: false,
-    syncError: latestError,
+    syncError: combinedLatestError,
+  });
+
+  devSyncLog("sync finished", {
+    pushed: synced,
+    pulled: pullResult.synced,
+    failed: totalFailed,
   });
 
   return {
-    ok: failed === 0,
-    synced,
-    failed,
-    latestError,
+    ok: totalFailed === 0,
+    synced: totalSynced,
+    failed: totalFailed,
+    latestError: combinedLatestError,
   };
 }
