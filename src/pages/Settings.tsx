@@ -146,7 +146,7 @@ export function Settings() {
 
   async function handleClearLocalTestData() {
     const shouldClear = window.confirm(
-      "Clear local offline test records? This will not delete Supabase data.",
+      "Warning: this will clear local test records saved on this device. This will not delete Supabase data. Continue?",
     );
 
     if (!shouldClear) return;

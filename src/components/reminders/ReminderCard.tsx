@@ -17,7 +17,7 @@ export function ReminderCard({ reminder }: { reminder: Reminder }) {
 
   return (
     <div className="flex items-start gap-3 rounded-lg border border-budget-border bg-budget-card p-3">
-      <div className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-budget-background">
+      <div className="grid h-10 w-10 shrink-0 place-items-center">
         <span aria-hidden="true" className="text-xl leading-none">
           {icon}
         </span>

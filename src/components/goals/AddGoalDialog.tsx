@@ -4,6 +4,7 @@ import { type FormEvent, useState } from "react";
 import { useAuth } from "../../contexts/AuthContext";
 import { addLocalGoal } from "../../lib/localDb";
 import { requestBackgroundSync } from "../../lib/requestBackgroundSync";
+import { playCreateSuccessFeedback } from "../../lib/soundFeedback";
 import type { GoalPriority, GoalType } from "../../types/finance";
 import { Button } from "../ui/Button";
 import { Modal } from "../ui/Modal";
@@ -39,6 +40,7 @@ export function AddGoalDialog() {
 
     setIsOpen(false);
     event.currentTarget.reset();
+    playCreateSuccessFeedback();
     requestBackgroundSync(user, "goal_created");
   }
 
