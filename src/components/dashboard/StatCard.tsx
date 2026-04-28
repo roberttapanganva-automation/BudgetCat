@@ -31,7 +31,7 @@ export function StatCard({
             {formatCurrency(value)}
           </p>
         </div>
-        <div className="grid h-11 w-11 shrink-0 place-items-center rounded-lg bg-budget-background">
+        <div className="grid h-11 w-11 shrink-0 place-items-center">
           <span aria-hidden="true" className="text-2xl leading-none">
             {icon}
           </span>

@@ -10,8 +10,18 @@ import { Card } from "../components/ui/Card";
 import { Modal } from "../components/ui/Modal";
 import { useAuth } from "../contexts/AuthContext";
 import { useToast } from "../hooks/useToast";
+import {
+  getCategoriesByType,
+  getCategoryLabel,
+  normalizeCategory,
+} from "../lib/categoryConfig";
 import { getTransactionIcon } from "../lib/iconMap";
 import { db, softDeleteLocalTransaction, updateLocalTransaction } from "../lib/localDb";
+import {
+  PAYMENT_METHOD_OPTIONS,
+  getPaymentMethodLabel,
+  normalizePaymentMethod,
+} from "../lib/paymentMethods";
 import { requestBackgroundSync } from "../lib/requestBackgroundSync";
 import { getTransactionErrorToast, getTransactionToast } from "../lib/transactionToast";
 import { formatCurrency } from "../lib/utils";
@@ -25,6 +35,15 @@ const typeLabels: Record<TransactionType, string> = {
   goal_contribution: "Goal Contribution",
 };
 
+function getCategoryTypeForTransaction(type: TransactionType) {
+  if (type === "salary") return "income";
+  if (type === "income") return "income";
+  if (type === "savings") return "savings";
+  if (type === "goal_contribution") return "savings";
+
+  return "expense";
+}
+
 export function Transactions() {
   const { user } = useAuth();
   const householdId = user?.householdId ?? "";
@@ -34,6 +53,7 @@ export function Transactions() {
     "this_month",
   );
   const [editingTransaction, setEditingTransaction] = useState<LocalTransaction | null>(null);
+
   const transactions =
     useLiveQuery(
       () =>
@@ -64,12 +84,14 @@ export function Transactions() {
       .filter((transaction) => {
         const haystack = [
           transaction.category,
-          transaction.payment_method,
+          getCategoryLabel(transaction.category),
+          getPaymentMethodLabel(transaction.payment_method),
           transaction.note,
           transaction.type,
         ]
           .join(" ")
           .toLowerCase();
+
         return haystack.includes(search.toLowerCase());
       })
       .sort((a, b) => b.date.localeCompare(a.date));
@@ -81,6 +103,7 @@ export function Transactions() {
         subtitle="Manual entries are saved locally first and synced when available."
         title="Transactions"
       />
+
       <Card className="mb-6 p-4">
         <div className="grid gap-3 md:grid-cols-[1fr_180px_180px]">
           <label className="relative">
@@ -95,6 +118,7 @@ export function Transactions() {
               value={search}
             />
           </label>
+
           <select
             className="budget-input"
             onChange={(event) => setTypeFilter(event.target.value as "all" | TransactionType)}
@@ -107,6 +131,7 @@ export function Transactions() {
               </option>
             ))}
           </select>
+
           <select
             className="budget-input"
             onChange={(event) =>
@@ -120,6 +145,7 @@ export function Transactions() {
           </select>
         </div>
       </Card>
+
       <Card className="p-0">
         <div className="hidden grid-cols-[1fr_160px_140px_140px] border-b border-budget-border px-5 py-4 text-xs font-black uppercase text-budget-text/45 md:grid">
           <span>Transaction</span>
@@ -127,9 +153,11 @@ export function Transactions() {
           <span>Date</span>
           <span className="text-right">Amount</span>
         </div>
+
         <div className="divide-y divide-budget-border">
           {filteredTransactions.map((transaction) => {
             const isPositive = transaction.type === "income" || transaction.type === "salary";
+
             return (
               <div
                 className="grid cursor-pointer gap-3 px-5 py-4 transition hover:bg-budget-background md:grid-cols-[1fr_160px_140px_140px] md:items-center"
@@ -144,16 +172,20 @@ export function Transactions() {
                     {typeLabels[transaction.type]}
                     <Pencil className="text-budget-text/35" size={14} />
                   </p>
+
                   <p className="text-sm font-semibold text-budget-text/55">
-                    {transaction.payment_method || "Payment method not set"}
+                    {getPaymentMethodLabel(transaction.payment_method)}
                   </p>
                 </div>
+
                 <Badge tone={isPositive ? "success" : "neutral"}>
-                  {transaction.category}
+                  {getCategoryLabel(transaction.category)}
                 </Badge>
+
                 <p className="text-sm font-bold text-budget-text/60">
                   {format(parseISO(transaction.date), "MMM d, yyyy")}
                 </p>
+
                 <p
                   className={
                     isPositive
@@ -167,6 +199,7 @@ export function Transactions() {
               </div>
             );
           })}
+
           {filteredTransactions.length === 0 && (
             <p className="px-5 py-8 text-sm font-semibold text-budget-text/55">
               No transactions match this view.
@@ -174,6 +207,7 @@ export function Transactions() {
           )}
         </div>
       </Card>
+
       <EditTransactionModal
         onClose={() => setEditingTransaction(null)}
         transaction={editingTransaction}
@@ -201,29 +235,64 @@ function EditTransactionModal({
   const [isSaving, setIsSaving] = useState(false);
   const showToast = useToast();
 
+  const categoryType = getCategoryTypeForTransaction(type);
+
+  const categoryOptions = useMemo(
+    () => getCategoriesByType(categoryType),
+    [categoryType],
+  );
+
   useEffect(() => {
     if (!transaction) return;
+
+    const normalizedCategory = normalizeCategory(transaction.category);
+
     setType(transaction.type);
     setAmount(String(transaction.amount));
-    setCategory(transaction.category);
+    setCategory(normalizedCategory?.id || transaction.category || "");
     setDate(transaction.date);
-    setPaymentMethod(transaction.payment_method);
+    setPaymentMethod(normalizePaymentMethod(transaction.payment_method));
     setNote(transaction.note ?? "");
   }, [transaction]);
+
+  useEffect(() => {
+    if (!category) return;
+
+    const normalizedCategory = normalizeCategory(category);
+    const normalizedCategoryId = normalizedCategory?.id;
+
+    const isStillValid = categoryOptions.some(
+      (categoryOption) =>
+        categoryOption.id === category || categoryOption.id === normalizedCategoryId,
+    );
+
+    if (isStillValid && normalizedCategoryId && category !== normalizedCategoryId) {
+      setCategory(normalizedCategoryId);
+      return;
+    }
+
+    if (!isStillValid) {
+      setCategory("");
+    }
+  }, [category, categoryOptions]);
 
   async function handleSave(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!transaction || isSaving) return;
 
     setIsSaving(true);
+
     try {
+      const normalizedCategory = normalizeCategory(category);
+      const savedCategory = normalizedCategory?.id || category || "Uncategorized";
+
       const updatedTransaction = {
         ...transaction,
         type,
         amount: Number(amount || 0),
-        category: category || "Uncategorized",
+        category: savedCategory,
         date,
-        payment_method: paymentMethod || "Cash",
+        payment_method: normalizePaymentMethod(paymentMethod),
         note,
       };
 
@@ -248,6 +317,7 @@ function EditTransactionModal({
 
   async function handleDelete() {
     if (!transaction) return;
+
     const confirmed = window.confirm("Delete this transaction from BudgetCat?");
     if (!confirmed) return;
 
@@ -273,6 +343,7 @@ function EditTransactionModal({
             ))}
           </select>
         </label>
+
         <label className="grid gap-2 text-sm font-bold">
           Amount
           <input
@@ -284,14 +355,23 @@ function EditTransactionModal({
             value={amount}
           />
         </label>
+
         <label className="grid gap-2 text-sm font-bold">
           Category
-          <input
+          <select
             className="budget-input"
             onChange={(event) => setCategory(event.target.value)}
             value={category}
-          />
+          >
+            <option value="">Select category</option>
+            {categoryOptions.map((categoryOption) => (
+              <option key={categoryOption.id} value={categoryOption.id}>
+                {categoryOption.label}
+              </option>
+            ))}
+          </select>
         </label>
+
         <label className="grid gap-2 text-sm font-bold">
           Date
           <input
@@ -301,14 +381,25 @@ function EditTransactionModal({
             value={date}
           />
         </label>
+
         <label className="grid gap-2 text-sm font-bold">
           Payment Method
-          <input
+          <select
             className="budget-input"
             onChange={(event) => setPaymentMethod(event.target.value)}
             value={paymentMethod}
-          />
+          >
+            {!PAYMENT_METHOD_OPTIONS.some((method) => method.id === paymentMethod) && (
+              <option value={paymentMethod}>{getPaymentMethodLabel(paymentMethod)}</option>
+            )}
+            {PAYMENT_METHOD_OPTIONS.map((method) => (
+              <option key={method.id} value={method.id}>
+                {method.label}
+              </option>
+            ))}
+          </select>
         </label>
+
         <label className="grid gap-2 text-sm font-bold sm:col-span-2">
           Notes
           <textarea
@@ -317,15 +408,18 @@ function EditTransactionModal({
             value={note}
           />
         </label>
+
         <div className="flex flex-col-reverse gap-3 sm:col-span-2 sm:flex-row sm:justify-between">
           <Button disabled={isSaving} onClick={handleDelete} type="button" variant="urgent">
             <Trash2 size={18} />
             Delete
           </Button>
+
           <div className="flex flex-col-reverse gap-3 sm:flex-row">
             <Button disabled={isSaving} onClick={onClose} type="button" variant="secondary">
               Cancel
             </Button>
+
             <Button disabled={isSaving} type="submit">
               {isSaving && (
                 <AnimatedStatusIcon

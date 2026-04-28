@@ -18,6 +18,7 @@ import {
 import { getMascotMood } from "../lib/mascotMood";
 import { getGoalReminders } from "../lib/reminders";
 import { requestBackgroundSync } from "../lib/requestBackgroundSync";
+import { playCreateSuccessFeedback } from "../lib/soundFeedback";
 import type { GoalPriority, GoalType, LocalGoal } from "../types/finance";
 
 export function Goals() {
@@ -291,6 +292,7 @@ function ContributionModal({
     );
 
     requestBackgroundSync(user, "goal_contribution_added");
+    playCreateSuccessFeedback();
     onClose();
   }
 

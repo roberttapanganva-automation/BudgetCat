@@ -5,6 +5,7 @@ import { useAuth } from "../../contexts/AuthContext";
 import { useToast } from "../../hooks/useToast";
 import { addLocalDueDate } from "../../lib/localDb";
 import { requestBackgroundSync } from "../../lib/requestBackgroundSync";
+import { playCreateSuccessFeedback } from "../../lib/soundFeedback";
 import type { DueDateStatus, RepeatType } from "../../types/finance";
 import { Button } from "../ui/Button";
 import { Modal } from "../ui/Modal";
@@ -56,6 +57,7 @@ export function AddDueDateDialog() {
         message: "Clyde will watch the due date for you.",
         tone: "success",
       });
+      playCreateSuccessFeedback();
       requestBackgroundSync(user, "due_date_saved");
     } catch {
       showToast({

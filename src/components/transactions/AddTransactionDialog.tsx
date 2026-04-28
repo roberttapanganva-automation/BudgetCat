@@ -1,12 +1,20 @@
 import { formatISO } from "date-fns";
 import { Loader2, Plus } from "lucide-react";
-import { type FormEvent, useState } from "react";
+import { type FormEvent, useEffect, useMemo, useState } from "react";
 import { useAuth } from "../../contexts/AuthContext";
 import { useToast } from "../../hooks/useToast";
+import {
+  getCategoriesByType,
+  normalizeCategory,
+} from "../../lib/categoryConfig";
 import { addLocalTransaction } from "../../lib/localDb";
+import {
+  PAYMENT_METHOD_OPTIONS,
+  normalizePaymentMethod,
+} from "../../lib/paymentMethods";
 import { getQuickAddPresets } from "../../lib/presets";
 import { requestBackgroundSync } from "../../lib/requestBackgroundSync";
-import { playReminderSound } from "../../lib/sound";
+import { playCreateSuccessFeedback } from "../../lib/soundFeedback";
 import { getTransactionErrorToast, getTransactionToast } from "../../lib/transactionToast";
 import type { TransactionType } from "../../types/finance";
 import { AnimatedStatusIcon } from "../ui/AnimatedStatusIcon";
@@ -20,6 +28,15 @@ const transactionTypes: Array<{ label: string; value: TransactionType }> = [
   { label: "Savings", value: "savings" },
   { label: "Goal Contribution", value: "goal_contribution" },
 ];
+
+function getCategoryTypeForTransaction(type: TransactionType) {
+  if (type === "salary") return "income";
+  if (type === "income") return "income";
+  if (type === "savings") return "savings";
+  if (type === "goal_contribution") return "savings";
+
+  return "expense";
+}
 
 export function AddTransactionDialog({
   className,
@@ -36,16 +53,44 @@ export function AddTransactionDialog({
   const [amount, setAmount] = useState("");
   const [category, setCategory] = useState("");
   const [date, setDate] = useState(formatISO(new Date(), { representation: "date" }));
-  const [paymentMethod, setPaymentMethod] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState("cash");
   const [note, setNote] = useState("");
   const presets = getQuickAddPresets();
+
+  const categoryType = getCategoryTypeForTransaction(type);
+
+  const categoryOptions = useMemo(
+    () => getCategoriesByType(categoryType),
+    [categoryType],
+  );
+
+  useEffect(() => {
+    if (!category) return;
+
+    const normalizedCategory = normalizeCategory(category);
+    const normalizedCategoryId = normalizedCategory?.id;
+
+    const isStillValid = categoryOptions.some(
+      (categoryOption) =>
+        categoryOption.id === category || categoryOption.id === normalizedCategoryId,
+    );
+
+    if (isStillValid && normalizedCategoryId && category !== normalizedCategoryId) {
+      setCategory(normalizedCategoryId);
+      return;
+    }
+
+    if (!isStillValid) {
+      setCategory("");
+    }
+  }, [category, categoryOptions]);
 
   function resetForm() {
     setType("expense");
     setAmount("");
     setCategory("");
     setDate(formatISO(new Date(), { representation: "date" }));
-    setPaymentMethod("");
+    setPaymentMethod("cash");
     setNote("");
   }
 
@@ -55,13 +100,16 @@ export function AddTransactionDialog({
 
     setIsSaving(true);
     try {
+      const normalizedCategory = normalizeCategory(category);
+      const savedCategory = normalizedCategory?.id || category || "Uncategorized";
+
       const savedTransaction = await addLocalTransaction(
         {
           type,
           amount: Number(amount || 0),
-          category: category || "Uncategorized",
+          category: savedCategory,
           date: date || formatISO(new Date(), { representation: "date" }),
-          payment_method: paymentMethod || "Cash",
+          payment_method: normalizePaymentMethod(paymentMethod),
           note,
         },
         user.id,
@@ -71,14 +119,7 @@ export function AddTransactionDialog({
       setIsOpen(false);
       resetForm();
       showToast(getTransactionToast(savedTransaction));
-      playReminderSound()
-        .then((result) => {
-          const reason = "reason" in result ? result.reason : "";
-          if (!result.ok && reason !== "Reminder sound is off.") {
-            console.warn("[BudgetCat Sound Warning]", reason);
-          }
-        })
-        .catch(() => undefined);
+      playCreateSuccessFeedback();
       requestBackgroundSync(user, "transaction_saved");
     } catch {
       showToast(getTransactionErrorToast());
@@ -93,6 +134,7 @@ export function AddTransactionDialog({
         <Plus size={18} />
         {label}
       </Button>
+
       <Modal
         isOpen={isOpen}
         onClose={() => setIsOpen(false)}
@@ -109,10 +151,12 @@ export function AddTransactionDialog({
                 key={preset.id}
                 disabled={isSaving}
                 onClick={() => {
+                  const normalizedPresetCategory = normalizeCategory(preset.category);
+
                   setType(preset.type);
                   setAmount(String(preset.amount));
-                  setCategory(preset.category);
-                  setPaymentMethod(preset.payment_method);
+                  setCategory(normalizedPresetCategory?.id || preset.category);
+                  setPaymentMethod(normalizePaymentMethod(preset.payment_method));
                   setNote(preset.note);
                   setDate(formatISO(new Date(), { representation: "date" }));
                 }}
@@ -123,6 +167,7 @@ export function AddTransactionDialog({
             ))}
           </div>
         </div>
+
         <form className="grid gap-4 sm:grid-cols-2" onSubmit={handleSubmit}>
           <label className="grid gap-2 text-sm font-bold">
             Type
@@ -138,6 +183,7 @@ export function AddTransactionDialog({
               ))}
             </select>
           </label>
+
           <label className="grid gap-2 text-sm font-bold">
             Amount
             <input
@@ -150,15 +196,23 @@ export function AddTransactionDialog({
               value={amount}
             />
           </label>
+
           <label className="grid gap-2 text-sm font-bold">
             Category
-            <input
+            <select
               className="budget-input"
               onChange={(event) => setCategory(event.target.value)}
-              placeholder="Food, Bills, Salary..."
               value={category}
-            />
+            >
+              <option value="">Select category</option>
+              {categoryOptions.map((categoryOption) => (
+                <option key={categoryOption.id} value={categoryOption.id}>
+                  {categoryOption.label}
+                </option>
+              ))}
+            </select>
           </label>
+
           <label className="grid gap-2 text-sm font-bold">
             Date
             <input
@@ -168,15 +222,22 @@ export function AddTransactionDialog({
               value={date}
             />
           </label>
+
           <label className="grid gap-2 text-sm font-bold">
             Payment Method
-            <input
+            <select
               className="budget-input"
               onChange={(event) => setPaymentMethod(event.target.value)}
-              placeholder="Cash, card, e-wallet"
               value={paymentMethod}
-            />
+            >
+              {PAYMENT_METHOD_OPTIONS.map((method) => (
+                <option key={method.id} value={method.id}>
+                  {method.label}
+                </option>
+              ))}
+            </select>
           </label>
+
           <label className="grid gap-2 text-sm font-bold sm:col-span-2">
             Notes
             <textarea
@@ -186,6 +247,7 @@ export function AddTransactionDialog({
               value={note}
             />
           </label>
+
           <div className="flex flex-col-reverse gap-3 sm:col-span-2 sm:flex-row sm:justify-end">
             <Button disabled={isSaving} onClick={() => setIsOpen(false)} variant="secondary">
               Cancel
