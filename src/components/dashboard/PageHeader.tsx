@@ -12,7 +12,7 @@ export function PageHeader({
   return (
     <header className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
       <div>
-        <p className="text-xs font-black uppercase tracking-[0.16em] text-budget-primary">
+        <p className="hidden text-xs font-black uppercase tracking-[0.16em] text-budget-primary md:block">
           BudgetCat
         </p>
         <h1 className="mt-1 text-2xl font-black text-budget-text md:text-3xl">

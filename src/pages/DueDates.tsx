@@ -81,9 +81,6 @@ export function DueDates() {
             variant={mobileMascotVariant}
           />
           <div className="min-w-0 pt-1">
-            <p className="text-xs font-black uppercase tracking-[0.16em] text-budget-primary">
-              BudgetCat
-            </p>
             <h1 className="mt-1 text-2xl font-black text-budget-text">Due Dates</h1>
             <p className="mt-2 text-sm font-semibold leading-6 text-budget-text/65">
               {mascotMood.message}
@@ -102,32 +99,28 @@ export function DueDates() {
               if (!bill) return null;
 
               return (
-                <div className="flex items-start gap-3" key={reminder.id}>
-                  <BudgetCatMascot
-                    className="budget-alert-nudge shrink-0"
-                    imageClassName="w-14 object-contain object-center"
-                    variant="bill"
-                  />
-                  <Card className="budget-alert-nudge min-w-0 flex-1 border-budget-urgent/40 bg-budget-urgent/10 p-4">
-                    <p className="text-xs font-black uppercase tracking-[0.16em] text-budget-urgent">
-                      Critical reminder
-                    </p>
-                    <h2 className="mt-1 text-base font-black text-budget-text">{bill.title}</h2>
-                    <p className="mt-1 text-sm font-semibold text-budget-text/65">
-                      {reminder.status.replace("_", " ")} - {format(parseISO(bill.due_date), "MMM d, yyyy")}
-                    </p>
-                    <p className="mt-2 font-display text-xl font-black text-budget-urgent">
-                      {formatCurrency(bill.amount)}
-                    </p>
-                    <Button
-                      className="mt-3 w-full"
-                      onClick={() => updateBillStatus(bill, "paid")}
-                      variant="urgent"
-                    >
-                      Pay Now
-                    </Button>
-                  </Card>
-                </div>
+                <Card
+                  className="budget-alert-nudge border-budget-urgent/40 bg-budget-urgent/10 p-4"
+                  key={reminder.id}
+                >
+                  <p className="text-xs font-black uppercase tracking-[0.16em] text-budget-urgent">
+                    Critical reminder
+                  </p>
+                  <h2 className="mt-1 text-base font-black text-budget-text">{bill.title}</h2>
+                  <p className="mt-1 text-sm font-semibold text-budget-text/65">
+                    {reminder.status.replace("_", " ")} - {format(parseISO(bill.due_date), "MMM d, yyyy")}
+                  </p>
+                  <p className="mt-2 font-display text-xl font-black text-budget-urgent">
+                    {formatCurrency(bill.amount)}
+                  </p>
+                  <Button
+                    className="mt-3 w-full"
+                    onClick={() => updateBillStatus(bill, "paid")}
+                    variant="urgent"
+                  >
+                    Pay Now
+                  </Button>
+                </Card>
               );
             })}
           </section>
@@ -136,9 +129,9 @@ export function DueDates() {
         <Card className="p-4">
           <div className="mb-3 flex items-center justify-between gap-3">
             <div>
-              <h2 className="text-base font-black">Bill reminders</h2>
+              <h2 className="text-base font-black">Stay on top of your bills</h2>
               <p className="text-sm font-semibold text-budget-text/55">
-                Bonnie and Clyde will nudge the urgent ones.
+                Bonnie and Clyde will remind you before anything&apos;s overdue.
               </p>
             </div>
           </div>

@@ -233,9 +233,6 @@ export function Settings() {
     <>
       <div className="md:hidden space-y-4">
         <section className="space-y-2">
-          <p className="text-xs font-black uppercase tracking-[0.16em] text-budget-primary">
-            BudgetCat
-          </p>
           <h1 className="text-2xl font-black text-budget-text">Settings</h1>
           <p className="text-sm font-semibold leading-6 text-budget-text/65">
             Personal app preferences and sync controls.

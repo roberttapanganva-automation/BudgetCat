@@ -78,9 +78,6 @@ export function Goals() {
             variant={mobileMascotVariant}
           />
           <div className="min-w-0 pt-1">
-            <p className="text-xs font-black uppercase tracking-[0.16em] text-budget-primary">
-              {goals.length === 0 ? "Bonnie's advice" : mascotMood.iconLabel}
-            </p>
             <h1 className="mt-1 text-2xl font-black text-budget-text">Goals</h1>
             <p className="mt-2 text-sm font-semibold leading-6 text-budget-text/65">
               {goals.length === 0

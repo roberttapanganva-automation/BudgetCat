@@ -15,7 +15,6 @@ import {
   getCategoryLabel,
   normalizeCategory,
 } from "../lib/categoryConfig";
-import { getTransactionIcon } from "../lib/iconMap";
 import { db, softDeleteLocalTransaction, updateLocalTransaction } from "../lib/localDb";
 import {
   PAYMENT_METHOD_OPTIONS,
@@ -35,6 +34,10 @@ const typeLabels: Record<TransactionType, string> = {
   goal_contribution: "Goal Contribution",
 };
 
+function safeText(value: unknown) {
+  return typeof value === "string" ? value : "";
+}
+
 function getCategoryTypeForTransaction(type: TransactionType) {
   if (type === "salary") return "income";
   if (type === "income") return "income";
@@ -44,7 +47,10 @@ function getCategoryTypeForTransaction(type: TransactionType) {
   return "expense";
 }
 
-function getMonthInterval(monthFilter: "this_month" | "last_month" | "all_time", referenceDate = new Date()) {
+function getMonthInterval(
+  monthFilter: "this_month" | "last_month" | "all_time",
+  referenceDate = new Date(),
+) {
   if (monthFilter === "this_month") {
     return { start: startOfMonth(referenceDate), end: endOfMonth(referenceDate) };
   }
@@ -55,6 +61,318 @@ function getMonthInterval(monthFilter: "this_month" | "last_month" | "all_time",
   }
 
   return null;
+}
+
+function getTransactionDisplayIcon(transaction: LocalTransaction) {
+  const normalizedCategory = normalizeCategory(transaction.category);
+  const categoryId = normalizedCategory?.id ?? safeText(transaction.category);
+  const categoryLabel = getCategoryLabel(transaction.category);
+
+  const searchableText = [
+    transaction.type,
+    categoryId,
+    categoryLabel,
+    safeText(transaction.note),
+    getPaymentMethodLabel(transaction.payment_method),
+  ]
+    .join(" ")
+    .toLowerCase();
+
+  // Income categories
+  if (
+    searchableText.includes("salary") ||
+    searchableText.includes("payroll") ||
+    searchableText.includes("wage")
+  ) {
+    return "💵";
+  }
+
+  if (
+    searchableText.includes("freelance") ||
+    searchableText.includes("client") ||
+    searchableText.includes("project income")
+  ) {
+    return "💻";
+  }
+
+  if (
+    searchableText.includes("business_income") ||
+    searchableText.includes("business income") ||
+    searchableText.includes("business")
+  ) {
+    return "🏢";
+  }
+
+  if (
+    searchableText.includes("bonus") ||
+    searchableText.includes("gift_income") ||
+    searchableText.includes("gift income") ||
+    searchableText.includes("gift")
+  ) {
+    return "🎁";
+  }
+
+  if (
+    searchableText.includes("allowance") ||
+    searchableText.includes("stipend")
+  ) {
+    return "💵";
+  }
+
+  if (
+    searchableText.includes("refund") ||
+    searchableText.includes("reimbursement")
+  ) {
+    return "↩️";
+  }
+
+  if (
+    searchableText.includes("interest") ||
+    searchableText.includes("bank interest")
+  ) {
+    return "🏦";
+  }
+
+  if (
+    searchableText.includes("other_income") ||
+    searchableText.includes("other income")
+  ) {
+    return "💰";
+  }
+
+  // Savings and goal categories
+  if (
+    searchableText.includes("emergency_fund") ||
+    searchableText.includes("emergency fund") ||
+    searchableText.includes("emergency")
+  ) {
+    return "🆘";
+  }
+
+  if (
+    searchableText.includes("travel_goal") ||
+    searchableText.includes("travel goal") ||
+    searchableText.includes("travel") ||
+    searchableText.includes("flight") ||
+    searchableText.includes("trip") ||
+    searchableText.includes("hotel")
+  ) {
+    return "✈️";
+  }
+
+  if (
+    searchableText.includes("home_goal") ||
+    searchableText.includes("home goal") ||
+    searchableText.includes("rent") ||
+    searchableText.includes("mortgage") ||
+    searchableText.includes("household") ||
+    searchableText.includes("house") ||
+    searchableText.includes("home")
+  ) {
+    return "🏠";
+  }
+
+  if (
+    searchableText.includes("gadget_goal") ||
+    searchableText.includes("gadget goal") ||
+    searchableText.includes("gadget") ||
+    searchableText.includes("phone") ||
+    searchableText.includes("laptop") ||
+    searchableText.includes("computer")
+  ) {
+    return "📱";
+  }
+
+  if (
+    searchableText.includes("education_goal") ||
+    searchableText.includes("education goal") ||
+    searchableText.includes("education") ||
+    searchableText.includes("school") ||
+    searchableText.includes("course") ||
+    searchableText.includes("learning")
+  ) {
+    return "📚";
+  }
+
+  if (
+    searchableText.includes("investment") ||
+    searchableText.includes("invest") ||
+    searchableText.includes("stock") ||
+    searchableText.includes("fund")
+  ) {
+    return "📈";
+  }
+
+  if (
+    searchableText.includes("general_savings") ||
+    searchableText.includes("general savings") ||
+    searchableText.includes("savings")
+  ) {
+    return "🌱";
+  }
+
+  if (
+    searchableText.includes("other_goal") ||
+    searchableText.includes("other goal") ||
+    searchableText.includes("goal_contribution") ||
+    searchableText.includes("goal contribution")
+  ) {
+    return "🎯";
+  }
+
+  // Expense categories
+  if (
+    searchableText.includes("food_groceries") ||
+    searchableText.includes("food & groceries") ||
+    searchableText.includes("grocery") ||
+    searchableText.includes("groceries") ||
+    searchableText.includes("market")
+  ) {
+    return "🛒";
+  }
+
+  if (
+    searchableText.includes("dining_out") ||
+    searchableText.includes("dining out") ||
+    searchableText.includes("restaurant") ||
+    searchableText.includes("meal")
+  ) {
+    return "🍽️";
+  }
+
+  if (
+    searchableText.includes("coffee_snacks") ||
+    searchableText.includes("coffee") ||
+    searchableText.includes("snack")
+  ) {
+    return "☕";
+  }
+
+  if (
+    searchableText.includes("transportation") ||
+    searchableText.includes("transport") ||
+    searchableText.includes("commute") ||
+    searchableText.includes("car") ||
+    searchableText.includes("vehicle")
+  ) {
+    return "🚗";
+  }
+
+  if (searchableText.includes("fuel") || searchableText.includes("gas")) {
+    return "⛽";
+  }
+
+  if (
+    searchableText.includes("shopping") ||
+    searchableText.includes("shop") ||
+    searchableText.includes("store")
+  ) {
+    return "🛍️";
+  }
+
+  if (
+    searchableText.includes("health_medicine") ||
+    searchableText.includes("health") ||
+    searchableText.includes("medicine") ||
+    searchableText.includes("medical") ||
+    searchableText.includes("pharmacy")
+  ) {
+    return "💊";
+  }
+
+  if (
+    searchableText.includes("entertainment") ||
+    searchableText.includes("movie") ||
+    searchableText.includes("music") ||
+    searchableText.includes("game")
+  ) {
+    return "🎬";
+  }
+
+  if (
+    searchableText.includes("fitness") ||
+    searchableText.includes("gym") ||
+    searchableText.includes("workout")
+  ) {
+    return "🏋️";
+  }
+
+  if (
+    searchableText.includes("personal_care") ||
+    searchableText.includes("personal care") ||
+    searchableText.includes("salon") ||
+    searchableText.includes("hygiene")
+  ) {
+    return "🧴";
+  }
+
+  if (
+    searchableText.includes("pets") ||
+    searchableText.includes("pet") ||
+    searchableText.includes("cat") ||
+    searchableText.includes("dog")
+  ) {
+    return "🐾";
+  }
+
+  if (
+    searchableText.includes("fees_charges") ||
+    searchableText.includes("fees & charges") ||
+    searchableText.includes("fee") ||
+    searchableText.includes("charge")
+  ) {
+    return "🏦";
+  }
+
+  if (
+    searchableText.includes("debt_payment") ||
+    searchableText.includes("debt payment") ||
+    searchableText.includes("debt") ||
+    searchableText.includes("loan") ||
+    searchableText.includes("credit")
+  ) {
+    return "💳";
+  }
+
+  if (
+    searchableText.includes("electric") ||
+    searchableText.includes("electricity") ||
+    searchableText.includes("power")
+  ) {
+    return "⚡";
+  }
+
+  if (searchableText.includes("water")) return "💧";
+
+  if (
+    searchableText.includes("internet") ||
+    searchableText.includes("wifi") ||
+    searchableText.includes("web")
+  ) {
+    return "🌐";
+  }
+
+  if (
+    searchableText.includes("mobile") ||
+    searchableText.includes("load")
+  ) {
+    return "📱";
+  }
+
+  if (
+    searchableText.includes("other_expense") ||
+    searchableText.includes("other expense")
+  ) {
+    return "🧾";
+  }
+
+  // Type fallback
+  if (transaction.type === "salary") return "💵";
+  if (transaction.type === "income") return "💰";
+  if (transaction.type === "savings") return "🌱";
+  if (transaction.type === "goal_contribution") return "🎯";
+
+  return "🧾";
 }
 
 export function Transactions() {
@@ -88,14 +406,15 @@ export function Transactions() {
       .filter((transaction) => typeFilter === "all" || transaction.type === typeFilter)
       .filter((transaction) => {
         if (!monthInterval) return true;
+
         return isWithinInterval(parseISO(transaction.date), monthInterval);
       })
       .filter((transaction) => {
         const haystack = [
-          transaction.category,
+          safeText(transaction.category),
           getCategoryLabel(transaction.category),
           getPaymentMethodLabel(transaction.payment_method),
-          transaction.note,
+          safeText(transaction.note),
           transaction.type,
         ]
           .join(" ")
@@ -114,6 +433,7 @@ export function Transactions() {
 
     const currentMonthInterval = getMonthInterval("this_month");
     const lastMonthInterval = getMonthInterval("last_month");
+
     const hasCurrentMonthTransactions = transactions.some((transaction) =>
       currentMonthInterval ? isWithinInterval(parseISO(transaction.date), currentMonthInterval) : false,
     );
@@ -131,7 +451,7 @@ export function Transactions() {
   return (
     <>
       <PageHeader
-        subtitle="Manual entries are saved locally first and synced when available."
+        subtitle="Your entries are saved instantly — synced automatically when you're online."
         title="Transactions"
       />
 
@@ -193,15 +513,17 @@ export function Transactions() {
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0 flex-1">
                     <div className="flex min-w-0 items-center gap-2">
-                      <span aria-hidden="true" className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-budget-background text-lg">
-                        {getTransactionIcon(transaction)}
+                      <span aria-hidden="true" className="shrink-0 text-xl leading-none">
+                        {getTransactionDisplayIcon(transaction)}
                       </span>
+
                       <div className="min-w-0">
                         <p className="truncate font-black">
                           {getCategoryLabel(transaction.category)}
                         </p>
                         <p className="text-xs font-semibold text-budget-text/55">
-                          {typeLabels[transaction.type]} • {getPaymentMethodLabel(transaction.payment_method)}
+                          {typeLabels[transaction.type]} •{" "}
+                          {getPaymentMethodLabel(transaction.payment_method)}
                         </p>
                       </div>
                     </div>
@@ -313,8 +635,8 @@ export function Transactions() {
                 >
                   <div>
                     <p className="flex items-center gap-2 font-black">
-                      <span aria-hidden="true" className="text-xl">
-                        {getTransactionIcon(transaction)}
+                      <span aria-hidden="true" className="shrink-0 text-xl leading-none">
+                        {getTransactionDisplayIcon(transaction)}
                       </span>
                       {typeLabels[transaction.type]}
                       <Pencil className="text-budget-text/35" size={14} />
@@ -400,7 +722,7 @@ function EditTransactionModal({
     setCategory(normalizedCategory?.id || transaction.category || "");
     setDate(transaction.date);
     setPaymentMethod(normalizePaymentMethod(transaction.payment_method));
-    setNote(transaction.note ?? "");
+    setNote(safeText(transaction.note));
   }, [transaction]);
 
   useEffect(() => {

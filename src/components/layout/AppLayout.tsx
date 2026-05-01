@@ -95,7 +95,9 @@ export function AppLayout() {
             <Link className="flex min-w-0 items-center gap-3" to="/">
               <BudgetCatMascot imageClassName="h-10 w-10 rounded-lg" variant="icon" />
               <div className="min-w-0">
-                <p className="truncate text-sm font-black leading-tight">BudgetCat</p>
+                <p className="truncate text-sm font-black leading-tight text-budget-primary">
+                  BudgetCat
+                </p>
                 <p className="truncate text-xs font-semibold text-budget-text/55">{mobileTitle}</p>
               </div>
             </Link>

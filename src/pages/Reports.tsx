@@ -1,6 +1,14 @@
 import { format, getMonth, parseISO } from "date-fns";
 import { useLiveQuery } from "dexie-react-hooks";
-import { CalendarDays, ReceiptText, Scale, TrendingDown, TrendingUp, Wallet } from "lucide-react";
+import {
+  ArrowDownRight,
+  CalendarDays,
+  ReceiptText,
+  Scale,
+  TrendingDown,
+  TrendingUp,
+  Wallet,
+} from "lucide-react";
 import { useState } from "react";
 import {
   Bar,
@@ -104,6 +112,8 @@ function WrittenSummary({
   highestCategory?: { name: string; amount: number; percent: number };
   highestBill?: { title: string; amount: number } | null;
 }) {
+  const totalOutflow = summary.expenses + summary.bills;
+
   return (
     <section className="mb-6">
       <div className="mb-3">
@@ -112,11 +122,12 @@ function WrittenSummary({
           Written totals from local BudgetCat data.
         </p>
       </div>
-      <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-5">
+      <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-6">
         <SummaryTile icon={Wallet} label="Salary / Income" tone="text-budget-cat" value={summary.income} />
         <SummaryTile icon={ReceiptText} label="Expenses" tone="text-budget-urgent" value={summary.expenses} />
         <SummaryTile icon={CalendarDays} label="Bills" tone="text-budget-urgent" value={summary.bills} />
         <SummaryTile icon={TrendingUp} label="Savings" tone="text-budget-primary" value={summary.savings} />
+        <SummaryTile icon={ArrowDownRight} label="Total Outflow" tone="text-budget-urgent" value={totalOutflow} />
         <SummaryTile
           icon={Scale}
           label="Net Amount"
@@ -126,7 +137,9 @@ function WrittenSummary({
       </div>
       <div className="grid gap-4 md:grid-cols-2">
         <Card className="p-4">
-          <p className="text-sm font-black text-budget-text/60">Highest expense category</p>
+          <p className="text-sm font-black text-budget-text/60">
+            Highest Expense by <span className="text-budget-cat">Cat</span>egory
+          </p>
           {highestCategory ? (
             <>
               <p className="mt-2 text-lg font-black text-budget-text">{highestCategory.name}</p>
@@ -250,10 +263,10 @@ export function Reports() {
     ? reports.yearlyData
     : reports.yearlyData.filter((month) => month.monthIndex === selectedMonth);
   const reportTitle = isYearlyView
-    ? "Year Comparison"
+    ? "This Year vs Last Year"
     : `${reports.selectedMonthLabel} Report`;
   const reportSubtitle = isYearlyView
-    ? `${reports.currentYear} compared with ${reports.previousYear}, grouped by month.`
+    ? "Monthly breakdown to track your progress over time"
     : `${reports.selectedMonthLabel} vs ${reports.monthOptions[selectedMonth]?.label ?? "Selected month"} ${reports.previousYear}.`;
 
   return (
@@ -276,8 +289,8 @@ export function Reports() {
             </select>
           </label>
         }
-        subtitle="Yearly comparison and monthly details from local BudgetCat data."
-        title="Reports"
+        subtitle="Your yearly comparison and monthly spending details, stored locally on your device."
+        title="Summary Reports"
       />
 
       {!reports.hasCurrentYearData && !reports.hasPreviousYearData && !reports.hasBillData && (
@@ -299,9 +312,11 @@ export function Reports() {
         <Card className="p-4">
           <div className="mb-3 flex items-center justify-between gap-3">
             <div>
-              <h3 className="text-base font-black text-budget-text">Category breakdown</h3>
+              <h3 className="text-base font-black text-budget-text">
+                Spending by <span className="text-budget-cat">Cat</span>egory
+              </h3>
               <p className="text-sm font-semibold text-budget-text/55">
-                Compact mobile expense rows with gold bars.
+                See where your money goes
               </p>
             </div>
           </div>
