@@ -51,7 +51,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
         {toasts.map((toast) => (
           <div
             className={cn(
-              "pointer-events-auto rounded-[14px] border bg-budget-card px-4 py-3 shadow-soft",
+              "pointer-events-auto rounded-[14px] border bg-budget-card px-4 py-3",
               toast.tone === "success" && "border-budget-success/30",
               toast.tone === "warning" && "border-budget-warning/40",
               toast.tone === "error" && "border-budget-urgent/35",

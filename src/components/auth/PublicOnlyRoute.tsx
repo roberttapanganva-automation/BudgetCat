@@ -12,7 +12,7 @@ export function PublicOnlyRoute() {
   if (isLoading) {
     return (
       <div className="grid min-h-screen place-items-center bg-budget-background text-budget-text">
-        <div className="rounded-lg border border-budget-border bg-budget-card p-5 text-sm font-bold shadow-soft">
+        <div className="rounded-lg border border-budget-border bg-budget-card p-5 text-sm font-bold">
           Loading BudgetCat...
         </div>
       </div>

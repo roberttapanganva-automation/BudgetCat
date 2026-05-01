@@ -20,7 +20,7 @@ export function StartupRecoveryScreen({ error, onTryAgain }: StartupRecoveryScre
 
   return (
     <div className="grid min-h-screen place-items-center bg-budget-background px-4 py-8 text-budget-text">
-      <section className="w-full max-w-lg rounded-xl border border-budget-border bg-budget-card p-6 shadow-soft">
+      <section className="w-full max-w-lg rounded-xl border border-budget-border bg-budget-card p-6">
         <div className="flex items-start gap-4">
           <div className="grid h-12 w-12 shrink-0 place-items-center rounded-lg bg-budget-warning/15 text-budget-warning">
             <AlertTriangle size={24} />

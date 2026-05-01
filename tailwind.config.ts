@@ -17,10 +17,6 @@ export default {
           border: "var(--budget-border)",
         },
       },
-      boxShadow: {
-        soft: "var(--budget-shadow)",
-        button: "0 10px 24px color-mix(in srgb, var(--budget-primary) 28%, transparent)",
-      },
       fontFamily: {
         sans: ["DM Sans", "Inter", "ui-sans-serif", "system-ui", "sans-serif"],
         display: ["Fraunces", "Georgia", "serif"],

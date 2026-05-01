@@ -231,6 +231,227 @@ export function Settings() {
 
   return (
     <>
+      <div className="md:hidden space-y-4">
+        <section className="space-y-2">
+          <h1 className="text-2xl font-black text-budget-text">Settings</h1>
+          <p className="text-sm font-semibold leading-6 text-budget-text/65">
+            Personal app preferences and sync controls.
+          </p>
+        </section>
+
+        <Card className="p-4">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-xs font-black uppercase tracking-[0.16em] text-budget-text/55">
+                Profile
+              </p>
+              <h2 className="mt-1 text-lg font-black">Nickname</h2>
+              <p className="mt-1 text-sm font-semibold text-budget-text/60">
+                This is what Bonnie and Clyde will call you.
+              </p>
+            </div>
+            <Badge tone={user?.isOffline ? "warning" : "success"}>
+              {user?.isOffline ? "Offline" : "Supabase"}
+            </Badge>
+          </div>
+          <input
+            className="budget-input mt-4"
+            onChange={(event) => setNickname(event.target.value)}
+            placeholder="Robert"
+            value={nickname}
+          />
+          {nicknameMessage && (
+            <p className="mt-2 text-sm font-semibold text-budget-text/65">{nicknameMessage}</p>
+          )}
+          <Button className="mt-4 w-full" onClick={handleSaveNickname}>
+            Save Nickname
+          </Button>
+          <Button className="mt-3 w-full" onClick={signOut} variant="secondary">
+            <LogOut size={18} />
+            Log Out
+          </Button>
+        </Card>
+
+        <Card className="p-4">
+          <p className="text-xs font-black uppercase tracking-[0.16em] text-budget-text/55">
+            Appearance
+          </p>
+          <div className="mt-3 flex items-center justify-between gap-3 rounded-xl bg-budget-background p-3 text-sm font-bold">
+            Theme
+            <ThemeToggle />
+          </div>
+          <label className="mt-3 flex items-center justify-between gap-4 rounded-xl bg-budget-background p-3 text-sm font-bold">
+            Warm dashboard density
+            <input defaultChecked type="checkbox" />
+          </label>
+          <label className="mt-3 flex items-center justify-between gap-4 rounded-xl bg-budget-background p-3 text-sm font-bold">
+            Show mascot reminders
+            <input defaultChecked type="checkbox" />
+          </label>
+        </Card>
+
+        <Card className="p-4">
+          <p className="text-xs font-black uppercase tracking-[0.16em] text-budget-text/55">
+            Sync
+          </p>
+          <div className="mt-3 grid gap-3">
+            <div className="rounded-xl bg-budget-background p-3">
+              <p className="text-sm font-black">Sync Status</p>
+              <p className="mt-1 text-sm font-semibold text-budget-text/55">
+                {pendingCount} pending local record{pendingCount === 1 ? "" : "s"}.
+              </p>
+              {syncStatus.isSyncing && (
+                <div className="mt-3">
+                  <div className="mb-2 flex items-center justify-between gap-3 text-xs font-black text-budget-text/55">
+                    <span>{syncStatus.currentTable ?? "Syncing"}</span>
+                    <span>{syncStatus.percentComplete}%</span>
+                  </div>
+                  <div className="h-2 overflow-hidden rounded-full bg-budget-background ring-1 ring-budget-border">
+                    <div
+                      className="h-full rounded-full bg-budget-primary transition-all duration-500 ease-out"
+                      style={{ width: `${syncStatus.percentComplete}%` }}
+                    />
+                  </div>
+                </div>
+              )}
+              {syncMessage && (
+                <p className="mt-2 text-sm font-semibold text-budget-text/65">{syncMessage}</p>
+              )}
+            </div>
+            {latestSyncError && (
+              <div className="rounded-xl border border-budget-urgent/30 bg-budget-urgent/10 p-3 text-sm">
+                <p className="font-black text-budget-urgent">
+                  Sync failed for {latestSyncError.tableName}
+                </p>
+                <p className="mt-1 font-semibold text-budget-text/70">{latestSyncError.message}</p>
+                {latestSyncError.code && (
+                  <p className="mt-1 text-xs font-semibold text-budget-text/50">
+                    Code: {latestSyncError.code}
+                  </p>
+                )}
+              </div>
+            )}
+            <div className="grid grid-cols-2 gap-3">
+              <Button onClick={handleSyncNow} variant="secondary">
+                <RefreshCcw size={18} />
+                Sync Now
+              </Button>
+              <Button onClick={handleRetryFailedSync} variant="secondary">
+                Retry Failed Sync
+              </Button>
+            </div>
+          </div>
+        </Card>
+
+        <Card className="p-4">
+          <p className="text-xs font-black uppercase tracking-[0.16em] text-budget-text/55">
+            Notifications
+          </p>
+          <div className="mt-3 flex flex-col gap-3">
+            <div className="rounded-xl bg-budget-background p-3">
+              <div className="flex items-center gap-3">
+                <Bell size={18} className="text-budget-primary" />
+                <div>
+                  <h2 className="text-sm font-black">Permission</h2>
+                  <p className="text-xs font-semibold text-budget-text/55">
+                    Status: {notificationStatus}
+                  </p>
+                </div>
+              </div>
+              <p className="mt-2 text-sm font-semibold leading-6 text-budget-text/60">
+                Local reminders are best-effort and may not fire if BudgetCat or the browser is closed.
+              </p>
+            </div>
+            {notificationMessage && (
+              <p className="rounded-xl bg-budget-background px-3 py-3 text-sm font-semibold text-budget-text/65">
+                {notificationMessage}
+              </p>
+            )}
+            <label className="grid gap-2 rounded-xl bg-budget-background p-3 text-sm font-bold">
+              <span className="inline-flex items-center gap-2">
+                <Volume2 size={18} />
+                Reminder sound
+              </span>
+              <select
+                className="budget-input"
+                onChange={(event) =>
+                  handleSoundPreferenceChange(event.target.value as ReminderSoundMode)
+                }
+                value={soundMode}
+              >
+                <option value="meow">Meow</option>
+                <option value="chime">Soft Chime</option>
+                <option value="off">Off</option>
+              </select>
+            </label>
+            <div className="grid grid-cols-2 gap-3">
+              <Button onClick={handleEnableNotifications} variant="secondary">
+                <Bell size={18} />
+                Enable Notifications
+              </Button>
+              <Button onClick={handleTestNotification} variant="secondary">
+                Test Notification
+              </Button>
+            </div>
+            <Button onClick={handleTestMeowSound} variant="secondary">
+              Test Meow Sound
+            </Button>
+          </div>
+        </Card>
+
+        <Card className="p-4">
+          <p className="text-xs font-black uppercase tracking-[0.16em] text-budget-text/55">
+            Data
+          </p>
+          <div className="mt-3 grid gap-3">
+            <div className="grid grid-cols-2 gap-3">
+              <Button onClick={() => handleExport("transactions_csv")} variant="secondary">
+                Transactions CSV
+              </Button>
+              <Button onClick={() => handleExport("due_dates_csv")} variant="secondary">
+                Due Dates CSV
+              </Button>
+              <Button onClick={() => handleExport("goals_csv")} variant="secondary">
+                Goals CSV
+              </Button>
+              <Button onClick={() => handleExport("full_backup_json")} variant="secondary">
+                Full Backup JSON
+              </Button>
+            </div>
+            <Button onClick={() => handleExport("goal_contributions_csv")} variant="ghost">
+              Goal Contributions CSV
+            </Button>
+            {exportMessage && (
+              <p className="text-sm font-semibold text-budget-text/65">{exportMessage}</p>
+            )}
+            <div className="rounded-xl bg-budget-background p-3 text-sm font-semibold text-budget-text/60">
+              <p className="font-black text-budget-text">PWA Install</p>
+              <p className="mt-1 leading-6">
+                BudgetCat is installable from supported browser menus. Use the install option to keep a private app shortcut on your device.
+              </p>
+              {pwaMessage && <p className="mt-2 text-budget-text/65">{pwaMessage}</p>}
+              <Button className="mt-3 w-full" disabled={!canInstallPwa} onClick={handleInstallPwa} variant="secondary">
+                Install BudgetCat
+              </Button>
+            </div>
+          </div>
+        </Card>
+
+        <Card className="p-4">
+          <p className="text-xs font-black uppercase tracking-[0.16em] text-budget-text/55">
+            Danger Zone
+          </p>
+          <Button className="mt-3 w-full" onClick={handleClearLocalTestData} variant="urgent">
+            <Trash2 size={18} />
+            Clear local test data
+          </Button>
+          <p className="mt-2 text-xs font-semibold text-budget-text/55">
+            This clears local test records only. Supabase data is not changed.
+          </p>
+        </Card>
+      </div>
+
+      <div className="hidden md:block">
       <PageHeader
         action={
           <div className="flex flex-wrap items-center gap-3">
@@ -488,6 +709,7 @@ export function Settings() {
           </div>
         </Card>
       </section>
+      </div>
     </>
   );
 }
