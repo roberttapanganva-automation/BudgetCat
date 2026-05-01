@@ -25,14 +25,30 @@ const currentYearColor = "var(--budget-primary)";
 const previousYearColor = "var(--budget-cream-3)";
 type ReportView = "yearly" | `${number}`;
 
+function getReportChartColor(key: string) {
+  if (key.toLowerCase().includes("income")) return "var(--budget-cat)";
+  if (key.toLowerCase().includes("expenses") || key.toLowerCase().includes("bills")) {
+    return "var(--budget-urgent)";
+  }
+  return currentYearColor;
+}
+
 function currencyTooltipFormatter(value: unknown) {
-  return formatCurrency(Number(value || 0));
+  return formatReportCurrency(Number(value || 0));
 }
 
 function compactCurrencyTick(value: unknown) {
   const amount = Number(value || 0);
-  if (Math.abs(amount) >= 1000) return `PHP ${Math.round(amount / 1000)}k`;
-  return `PHP ${amount}`;
+  if (Math.abs(amount) >= 1000) return `₱${Math.round(amount / 1000)}k`;
+  return `₱${amount}`;
+}
+
+function formatReportCurrency(amount: number) {
+  return formatCurrency(amount).replace(/^PHP\s?/, "₱");
+}
+
+function cleanReportText(value: string) {
+  return value.replace(/PHP\s?/g, "₱");
 }
 
 function EmptyReportState({ children }: { children: string }) {
@@ -55,12 +71,12 @@ function SummaryTile({
   icon: typeof Wallet;
 }) {
   return (
-    <Card className="min-w-0 p-4">
+    <Card className="min-w-0 p-3 sm:p-4">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-sm font-black text-budget-text/60">{label}</p>
           <p className={cn("mt-2 whitespace-nowrap font-display text-2xl font-black", tone)}>
-            {formatCurrency(value)}
+            {formatReportCurrency(value)}
           </p>
         </div>
         <div className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-budget-background text-budget-primary">
@@ -96,10 +112,10 @@ function WrittenSummary({
           Written totals from local BudgetCat data.
         </p>
       </div>
-      <div className="mb-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
-        <SummaryTile icon={Wallet} label="Salary / Income" tone="text-budget-success" value={summary.income} />
-        <SummaryTile icon={ReceiptText} label="Expenses" tone="text-budget-warning" value={summary.expenses} />
-        <SummaryTile icon={CalendarDays} label="Bills" tone="text-budget-cat" value={summary.bills} />
+      <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-5">
+        <SummaryTile icon={Wallet} label="Salary / Income" tone="text-budget-cat" value={summary.income} />
+        <SummaryTile icon={ReceiptText} label="Expenses" tone="text-budget-urgent" value={summary.expenses} />
+        <SummaryTile icon={CalendarDays} label="Bills" tone="text-budget-urgent" value={summary.bills} />
         <SummaryTile icon={TrendingUp} label="Savings" tone="text-budget-primary" value={summary.savings} />
         <SummaryTile
           icon={Scale}
@@ -115,7 +131,7 @@ function WrittenSummary({
             <>
               <p className="mt-2 text-lg font-black text-budget-text">{highestCategory.name}</p>
               <p className="text-sm font-semibold text-budget-text/55">
-                {formatCurrency(highestCategory.amount)} - {highestCategory.percent}% of expenses
+                {formatReportCurrency(highestCategory.amount)} - {highestCategory.percent}% of expenses
               </p>
             </>
           ) : (
@@ -130,7 +146,7 @@ function WrittenSummary({
             <>
               <p className="mt-2 text-lg font-black text-budget-text">{highestBill.title}</p>
               <p className="text-sm font-semibold text-budget-text/55">
-                {formatCurrency(highestBill.amount)}
+                {formatReportCurrency(highestBill.amount)}
               </p>
             </>
           ) : (
@@ -185,7 +201,7 @@ function YearlyComparisonChart({
             <Tooltip formatter={currencyTooltipFormatter} />
             <Legend wrapperStyle={{ fontSize: 12, fontWeight: 800 }} />
             <Bar dataKey={previousKey} fill={previousYearColor} name={String(previousYear)} radius={[8, 8, 0, 0]} />
-            <Bar dataKey={currentKey} fill={currentYearColor} name={String(currentYear)} radius={[8, 8, 0, 0]} />
+            <Bar dataKey={currentKey} fill={getReportChartColor(currentKey)} name={String(currentYear)} radius={[8, 8, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
       )}
@@ -278,6 +294,51 @@ export function Reports() {
         summary={isYearlyView ? reports.yearlySummary : reports.selectedMonthSummary}
         title={isYearlyView ? `${reports.currentYear} Written Summary` : `${reports.selectedMonthLabel} Written Summary`}
       />
+
+      <div className="mb-6 md:hidden">
+        <Card className="p-4">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <div>
+              <h3 className="text-base font-black text-budget-text">Category breakdown</h3>
+              <p className="text-sm font-semibold text-budget-text/55">
+                Compact mobile expense rows with gold bars.
+              </p>
+            </div>
+          </div>
+          <div className="grid gap-3">
+            {(isYearlyView ? reports.yearlyCategories : reports.selectedMonthCategories).length > 0 ? (
+              (isYearlyView ? reports.yearlyCategories : reports.selectedMonthCategories).map(
+                (category) => (
+                  <div
+                    className="grid gap-2 rounded-xl border border-budget-border bg-budget-background p-3"
+                    key={category.name}
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="truncate text-sm font-black text-budget-text">{category.name}</p>
+                      <p className="shrink-0 text-xs font-black text-budget-text/55">
+                        {category.percent}%
+                      </p>
+                    </div>
+                    <div className="h-2 overflow-hidden rounded-full bg-budget-urgent/10 ring-1 ring-budget-border">
+                      <div
+                        className="h-full rounded-full bg-budget-urgent"
+                        style={{ width: `${category.percent}%` }}
+                      />
+                    </div>
+                    <p className="text-xs font-semibold text-budget-urgent">
+                      {formatReportCurrency(category.amount)}
+                    </p>
+                  </div>
+                ),
+              )
+            ) : (
+              <p className="rounded-xl bg-budget-background p-4 text-sm font-semibold text-budget-text/55">
+                No category data yet.
+              </p>
+            )}
+          </div>
+        </Card>
+      </div>
 
       <section className="mb-6">
         <div className="mb-3">
@@ -397,7 +458,7 @@ export function Reports() {
                       {formatDate(bill.dueDate)} - {bill.status}
                     </p>
                   </div>
-                  <p className="font-display text-lg font-black">{formatCurrency(bill.amount)}</p>
+                  <p className="font-display text-lg font-black text-budget-urgent">{formatReportCurrency(bill.amount)}</p>
                 </div>
               ))}
               {reports.selectedMonthBills.length === 0 && (
@@ -431,7 +492,7 @@ export function Reports() {
                   </div>
                   <p className={cn("font-black", isPositive ? "text-budget-success" : "text-budget-text")}>
                     {isPositive ? "+" : "-"}
-                    {formatCurrency(transaction.amount)}
+                    {formatReportCurrency(transaction.amount)}
                   </p>
                 </div>
               );
@@ -453,7 +514,7 @@ export function Reports() {
                   {insight.includes("below") ? <TrendingDown size={18} /> : <TrendingUp size={18} />}
                 </div>
                 <p className="min-w-0 text-sm font-bold leading-6 text-budget-text/70">
-                  {insight}
+                  {cleanReportText(insight)}
                 </p>
               </div>
             ))}

@@ -44,6 +44,19 @@ function getCategoryTypeForTransaction(type: TransactionType) {
   return "expense";
 }
 
+function getMonthInterval(monthFilter: "this_month" | "last_month" | "all_time", referenceDate = new Date()) {
+  if (monthFilter === "this_month") {
+    return { start: startOfMonth(referenceDate), end: endOfMonth(referenceDate) };
+  }
+
+  if (monthFilter === "last_month") {
+    const lastMonth = subMonths(referenceDate, 1);
+    return { start: startOfMonth(lastMonth), end: endOfMonth(lastMonth) };
+  }
+
+  return null;
+}
+
 export function Transactions() {
   const { user } = useAuth();
   const householdId = user?.householdId ?? "";
@@ -52,6 +65,7 @@ export function Transactions() {
   const [monthFilter, setMonthFilter] = useState<"this_month" | "last_month" | "all_time">(
     "this_month",
   );
+  const [mobileMonthFallbackApplied, setMobileMonthFallbackApplied] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<LocalTransaction | null>(null);
 
   const transactions =
@@ -68,12 +82,7 @@ export function Transactions() {
 
   const filteredTransactions = useMemo(() => {
     const now = new Date();
-    const monthInterval =
-      monthFilter === "this_month"
-        ? { start: startOfMonth(now), end: endOfMonth(now) }
-        : monthFilter === "last_month"
-          ? { start: startOfMonth(subMonths(now, 1)), end: endOfMonth(subMonths(now, 1)) }
-          : null;
+    const monthInterval = getMonthInterval(monthFilter, now);
 
     return transactions
       .filter((transaction) => typeFilter === "all" || transaction.type === typeFilter)
@@ -97,6 +106,28 @@ export function Transactions() {
       .sort((a, b) => b.date.localeCompare(a.date));
   }, [monthFilter, search, transactions, typeFilter]);
 
+  useEffect(() => {
+    if (mobileMonthFallbackApplied) return;
+    if (window.innerWidth >= 768) return;
+    if (monthFilter !== "this_month") return;
+    if (transactions.length === 0) return;
+
+    const currentMonthInterval = getMonthInterval("this_month");
+    const lastMonthInterval = getMonthInterval("last_month");
+    const hasCurrentMonthTransactions = transactions.some((transaction) =>
+      currentMonthInterval ? isWithinInterval(parseISO(transaction.date), currentMonthInterval) : false,
+    );
+
+    if (hasCurrentMonthTransactions) return;
+
+    const hasLastMonthTransactions = transactions.some((transaction) =>
+      lastMonthInterval ? isWithinInterval(parseISO(transaction.date), lastMonthInterval) : false,
+    );
+
+    setMonthFilter(hasLastMonthTransactions ? "last_month" : "all_time");
+    setMobileMonthFallbackApplied(true);
+  }, [mobileMonthFallbackApplied, monthFilter, transactions]);
+
   return (
     <>
       <PageHeader
@@ -104,109 +135,226 @@ export function Transactions() {
         title="Transactions"
       />
 
-      <Card className="mb-6 p-4">
-        <div className="grid gap-3 md:grid-cols-[1fr_180px_180px]">
-          <label className="relative">
-            <Search
-              className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-budget-text/40"
-              size={18}
-            />
-            <input
-              className="budget-input pl-11"
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Search transactions"
-              value={search}
-            />
-          </label>
+      <div className="md:hidden">
+        <Card className="mb-4 p-4">
+          <div className="grid gap-3">
+            <label className="relative">
+              <Search
+                className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-budget-text/40"
+                size={18}
+              />
+              <input
+                className="budget-input pl-11"
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Search transactions"
+                value={search}
+              />
+            </label>
 
-          <select
-            className="budget-input"
-            onChange={(event) => setTypeFilter(event.target.value as "all" | TransactionType)}
-            value={typeFilter}
-          >
-            <option value="all">All types</option>
-            {Object.entries(typeLabels).map(([value, label]) => (
-              <option key={value} value={value}>
-                {label}
-              </option>
-            ))}
-          </select>
+            <div className="grid grid-cols-2 gap-3">
+              <select
+                className="budget-input"
+                onChange={(event) => setTypeFilter(event.target.value as "all" | TransactionType)}
+                value={typeFilter}
+              >
+                <option value="all">All types</option>
+                {Object.entries(typeLabels).map(([value, label]) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
+              </select>
 
-          <select
-            className="budget-input"
-            onChange={(event) =>
-              setMonthFilter(event.target.value as "this_month" | "last_month" | "all_time")
-            }
-            value={monthFilter}
-          >
-            <option value="this_month">This month</option>
-            <option value="last_month">Last month</option>
-            <option value="all_time">All time</option>
-          </select>
-        </div>
-      </Card>
+              <select
+                className="budget-input"
+                onChange={(event) =>
+                  setMonthFilter(event.target.value as "this_month" | "last_month" | "all_time")
+                }
+                value={monthFilter}
+              >
+                <option value="this_month">This month</option>
+                <option value="last_month">Last month</option>
+                <option value="all_time">All time</option>
+              </select>
+            </div>
+          </div>
+        </Card>
 
-      <Card className="p-0">
-        <div className="hidden grid-cols-[1fr_160px_140px_140px] border-b border-budget-border px-5 py-4 text-xs font-black uppercase text-budget-text/45 md:grid">
-          <span>Transaction</span>
-          <span>Category</span>
-          <span>Date</span>
-          <span className="text-right">Amount</span>
-        </div>
-
-        <div className="divide-y divide-budget-border">
+        <div className="grid gap-3">
           {filteredTransactions.map((transaction) => {
             const isPositive = transaction.type === "income" || transaction.type === "salary";
 
             return (
-              <div
-                className="grid cursor-pointer gap-3 px-5 py-4 transition hover:bg-budget-background md:grid-cols-[1fr_160px_140px_140px] md:items-center"
+              <Card
+                className="cursor-pointer p-4 transition hover:bg-budget-background"
                 key={transaction.id}
                 onClick={() => setEditingTransaction(transaction)}
               >
-                <div>
-                  <p className="flex items-center gap-2 font-black">
-                    <span aria-hidden="true" className="text-xl">
-                      {getTransactionIcon(transaction)}
-                    </span>
-                    {typeLabels[transaction.type]}
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex min-w-0 items-center gap-2">
+                      <span aria-hidden="true" className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-budget-background text-lg">
+                        {getTransactionIcon(transaction)}
+                      </span>
+                      <div className="min-w-0">
+                        <p className="truncate font-black">
+                          {getCategoryLabel(transaction.category)}
+                        </p>
+                        <p className="text-xs font-semibold text-budget-text/55">
+                          {typeLabels[transaction.type]} • {getPaymentMethodLabel(transaction.payment_method)}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                      <Badge tone={isPositive ? "success" : "urgent"}>
+                        {transaction.type === "goal_contribution"
+                          ? "Goal Contribution"
+                          : transaction.type === "savings"
+                            ? "Savings"
+                            : transaction.type === "salary"
+                              ? "Salary"
+                              : transaction.type === "income"
+                                ? "Income"
+                                : "Expense"}
+                      </Badge>
+                      <span className="text-xs font-semibold text-budget-text/55">
+                        {format(parseISO(transaction.date), "MMM d, yyyy")}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex shrink-0 flex-col items-end gap-2 text-right">
+                    <p
+                      className={
+                        isPositive
+                          ? "text-base font-black text-budget-success"
+                          : "text-base font-black text-budget-urgent"
+                      }
+                    >
+                      {isPositive ? "+" : "-"}
+                      {formatCurrency(transaction.amount)}
+                    </p>
                     <Pencil className="text-budget-text/35" size={14} />
-                  </p>
-
-                  <p className="text-sm font-semibold text-budget-text/55">
-                    {getPaymentMethodLabel(transaction.payment_method)}
-                  </p>
+                  </div>
                 </div>
-
-                <Badge tone={isPositive ? "success" : "neutral"}>
-                  {getCategoryLabel(transaction.category)}
-                </Badge>
-
-                <p className="text-sm font-bold text-budget-text/60">
-                  {format(parseISO(transaction.date), "MMM d, yyyy")}
-                </p>
-
-                <p
-                  className={
-                    isPositive
-                      ? "font-black text-budget-success md:text-right"
-                      : "font-black text-budget-text md:text-right"
-                  }
-                >
-                  {isPositive ? "+" : "-"}
-                  {formatCurrency(transaction.amount)}
-                </p>
-              </div>
+              </Card>
             );
           })}
 
           {filteredTransactions.length === 0 && (
-            <p className="px-5 py-8 text-sm font-semibold text-budget-text/55">
+            <Card className="p-5 text-sm font-semibold text-budget-text/55">
               No transactions match this view.
-            </p>
+            </Card>
           )}
         </div>
-      </Card>
+      </div>
+
+      <div className="hidden md:block">
+        <Card className="mb-6 p-4">
+          <div className="grid gap-3 md:grid-cols-[1fr_180px_180px]">
+            <label className="relative">
+              <Search
+                className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-budget-text/40"
+                size={18}
+              />
+              <input
+                className="budget-input pl-11"
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Search transactions"
+                value={search}
+              />
+            </label>
+
+            <select
+              className="budget-input"
+              onChange={(event) => setTypeFilter(event.target.value as "all" | TransactionType)}
+              value={typeFilter}
+            >
+              <option value="all">All types</option>
+              {Object.entries(typeLabels).map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </select>
+
+            <select
+              className="budget-input"
+              onChange={(event) =>
+                setMonthFilter(event.target.value as "this_month" | "last_month" | "all_time")
+              }
+              value={monthFilter}
+            >
+              <option value="this_month">This month</option>
+              <option value="last_month">Last month</option>
+              <option value="all_time">All time</option>
+            </select>
+          </div>
+        </Card>
+
+        <Card className="p-0">
+          <div className="hidden grid-cols-[1fr_160px_140px_140px] border-b border-budget-border px-5 py-4 text-xs font-black uppercase text-budget-text/45 md:grid">
+            <span>Transaction</span>
+            <span>Category</span>
+            <span>Date</span>
+            <span className="text-right">Amount</span>
+          </div>
+
+          <div className="divide-y divide-budget-border">
+            {filteredTransactions.map((transaction) => {
+              const isPositive = transaction.type === "income" || transaction.type === "salary";
+
+              return (
+                <div
+                  className="grid cursor-pointer gap-3 px-5 py-4 transition hover:bg-budget-background md:grid-cols-[1fr_160px_140px_140px] md:items-center"
+                  key={transaction.id}
+                  onClick={() => setEditingTransaction(transaction)}
+                >
+                  <div>
+                    <p className="flex items-center gap-2 font-black">
+                      <span aria-hidden="true" className="text-xl">
+                        {getTransactionIcon(transaction)}
+                      </span>
+                      {typeLabels[transaction.type]}
+                      <Pencil className="text-budget-text/35" size={14} />
+                    </p>
+
+                    <p className="text-sm font-semibold text-budget-text/55">
+                      {getPaymentMethodLabel(transaction.payment_method)}
+                    </p>
+                  </div>
+
+                  <Badge tone={isPositive ? "success" : "urgent"}>
+                    {getCategoryLabel(transaction.category)}
+                  </Badge>
+
+                  <p className="text-sm font-bold text-budget-text/60">
+                    {format(parseISO(transaction.date), "MMM d, yyyy")}
+                  </p>
+
+                  <p
+                    className={
+                      isPositive
+                        ? "font-black text-budget-success md:text-right"
+                        : "font-black text-budget-urgent md:text-right"
+                    }
+                  >
+                    {isPositive ? "+" : "-"}
+                    {formatCurrency(transaction.amount)}
+                  </p>
+                </div>
+              );
+            })}
+
+            {filteredTransactions.length === 0 && (
+              <p className="px-5 py-8 text-sm font-semibold text-budget-text/55">
+                No transactions match this view.
+              </p>
+            )}
+          </div>
+        </Card>
+      </div>
 
       <EditTransactionModal
         onClose={() => setEditingTransaction(null)}

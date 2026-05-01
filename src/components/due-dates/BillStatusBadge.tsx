@@ -40,8 +40,11 @@ export function BillStatusBadge({ status }: { status: string }) {
   }
   if (normalized === "upcoming") {
     return (
-      <Badge className="gap-1.5">
-        <AnimatedStatusIcon className="h-[13px] w-[13px] text-budget-text/55" icon={CalendarDays} />
+      <Badge className="gap-1.5" tone="warning">
+        <AnimatedStatusIcon
+          className="h-[13px] w-[13px] text-budget-warning"
+          icon={CalendarDays}
+        />
         Upcoming
       </Badge>
     );
