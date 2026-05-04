@@ -1068,7 +1068,7 @@ const billsSparklinePoints = isYearlyView
             <div className="pointer-events-none absolute inset-y-0 right-0 z-0 w-[52%] overflow-hidden">
               <BudgetCatMascot
                 className="absolute inset-0 flex h-full w-full items-center justify-center"
-                imageClassName="h-full w-full scale-[4.50] object-contain object-center drop-shadow-2xl"
+                imageClassName="h-full w-full scale-[3.75] object-contain object-center drop-shadow-2xl"
                 variant="both"
               />
             </div>
@@ -1086,7 +1086,7 @@ const billsSparklinePoints = isYearlyView
                   BudgetCat
                 </h2>
                 <p className="mt-1 text-sm font-semibold text-[var(--bc-text-muted)]">
-                  Smart ∙ Friendly ∙ Focused.
+                  Smart•Friendly•Focused.
                 </p>
               </div>
 

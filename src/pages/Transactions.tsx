@@ -12,13 +12,22 @@ import {
   ArrowDownCircle,
   ArrowUpCircle,
   CalendarDays,
+  Check,
+  ChevronDown,
+  DollarSign,
   Filter,
+  ListFilter,
   Loader2,
   Pencil,
+  PiggyBank,
   Search,
   Sparkles,
+  Target,
   Trash2,
+  TrendingDown,
+  TrendingUp,
   WalletCards,
+  type LucideIcon,
 } from "lucide-react";
 import { type FormEvent, useEffect, useMemo, useState } from "react";
 
@@ -56,7 +65,21 @@ import type {
 } from "../types/finance";
 
 type TransactionFilter = "all" | TransactionType;
-type MonthFilter = "this_month" | "last_month" | "all_time";
+type MonthFilter = "all_time" | `month_${number}_${number}`;
+
+type MonthFilterOption = {
+  value: MonthFilter;
+  label: string;
+  shortLabel: string;
+  icon: LucideIcon;
+};
+
+type TransactionFilterOption = {
+  value: TransactionFilter;
+  label: string;
+  icon: LucideIcon;
+  className: string;
+};
 
 const typeLabels: Record<TransactionType, string> = {
   expense: "Expense",
@@ -66,20 +89,55 @@ const typeLabels: Record<TransactionType, string> = {
   goal_contribution: "Goal Contribution",
 };
 
-const filterTypeLabels: Record<TransactionFilter, string> = {
-  all: "All types",
-  expense: "Expenses",
-  income: "Income",
-  salary: "Salary",
-  savings: "Savings",
-  goal_contribution: "Goal Contributions",
-};
+const typeFilterOptions: TransactionFilterOption[] = [
+  {
+    value: "all",
+    label: "All types",
+    icon: ListFilter,
+    className: "text-[var(--bc-text-soft)]",
+  },
+  {
+    value: "expense",
+    label: "Expenses",
+    icon: TrendingDown,
+    className: "text-[var(--bc-red)]",
+  },
+  {
+    value: "income",
+    label: "Income",
+    icon: TrendingUp,
+    className: "text-[var(--bc-green)]",
+  },
+  {
+    value: "salary",
+    label: "Salary",
+    icon: DollarSign,
+    className: "text-[var(--bc-green)]",
+  },
+  {
+    value: "savings",
+    label: "Savings",
+    icon: PiggyBank,
+    className: "text-[var(--bc-blue)]",
+  },
+  {
+    value: "goal_contribution",
+    label: "Goal Contributions",
+    icon: Target,
+    className: "text-[var(--bc-purple)]",
+  },
+];
 
-const monthLabels: Record<MonthFilter, string> = {
-  this_month: "This month",
-  last_month: "Last month",
-  all_time: "All time",
-};
+const filterTypeLabels: Record<TransactionFilter, string> =
+  typeFilterOptions.reduce(
+    (labels, option) => {
+      labels[option.value] = option.label;
+      return labels;
+    },
+    {} as Record<TransactionFilter, string>,
+  );
+
+const MONTH_INDEXES = Array.from({ length: 12 }, (_, index) => index);
 
 function safeText(value: unknown) {
   return typeof value === "string" ? value : "";
@@ -115,27 +173,100 @@ function getCategoryTypeForTransaction(type: TransactionType) {
   return "expense";
 }
 
-function getMonthInterval(
-  monthFilter: MonthFilter,
-  referenceDate = new Date(),
-) {
-  if (monthFilter === "this_month") {
+function getMonthFilterValue(date = new Date()): MonthFilter {
+  return `month_${date.getFullYear()}_${date.getMonth()}` as MonthFilter;
+}
+
+function parseMonthFilter(monthFilter: MonthFilter) {
+  if (monthFilter === "all_time") return null;
+
+  const match = /^month_(\d{4})_(\d{1,2})$/.exec(monthFilter);
+
+  if (!match) return null;
+
+  const year = Number(match[1]);
+  const monthIndex = Number(match[2]);
+
+  if (
+    !Number.isInteger(year) ||
+    !Number.isInteger(monthIndex) ||
+    monthIndex < 0 ||
+    monthIndex > 11
+  ) {
+    return null;
+  }
+
+  return { year, monthIndex };
+}
+
+function getMonthFilterOptions(referenceDate = new Date()): MonthFilterOption[] {
+  const year = referenceDate.getFullYear();
+
+  return [
+    ...MONTH_INDEXES.map((monthIndex) => {
+      const monthDate = new Date(year, monthIndex, 1);
+
+      return {
+        value: `month_${year}_${monthIndex}` as MonthFilter,
+        label: format(monthDate, "MMMM"),
+        shortLabel: format(monthDate, "MMM"),
+        icon: CalendarDays,
+      };
+    }),
+    {
+      value: "all_time" as MonthFilter,
+      label: "All time",
+      shortLabel: "All",
+      icon: Sparkles,
+    },
+  ];
+}
+
+function getMonthFilterOptionFromValue(value: MonthFilter): MonthFilterOption {
+  if (value === "all_time") {
     return {
-      start: startOfMonth(referenceDate),
-      end: endOfMonth(referenceDate),
+      value,
+      label: "All time",
+      shortLabel: "All",
+      icon: Sparkles,
     };
   }
 
-  if (monthFilter === "last_month") {
-    const lastMonth = subMonths(referenceDate, 1);
+  const parsed = parseMonthFilter(value);
 
-    return {
-      start: startOfMonth(lastMonth),
-      end: endOfMonth(lastMonth),
-    };
+  if (!parsed) {
+    return getMonthFilterOptions()[new Date().getMonth()];
   }
 
-  return null;
+  const monthDate = new Date(parsed.year, parsed.monthIndex, 1);
+
+  return {
+    value,
+    label: format(monthDate, "MMMM"),
+    shortLabel: format(monthDate, "MMM"),
+    icon: CalendarDays,
+  };
+}
+
+function getMonthFilterLabel(monthFilter: MonthFilter) {
+  return getMonthFilterOptionFromValue(monthFilter).shortLabel;
+}
+
+function getMonthInterval(monthFilter: MonthFilter) {
+  if (monthFilter === "all_time") {
+    return null;
+  }
+
+  const parsed = parseMonthFilter(monthFilter);
+
+  if (!parsed) return null;
+
+  const selectedMonth = new Date(parsed.year, parsed.monthIndex, 1);
+
+  return {
+    start: startOfMonth(selectedMonth),
+    end: endOfMonth(selectedMonth),
+  };
 }
 
 function getTransactionSearchText(transaction: LocalTransaction) {
@@ -166,13 +297,13 @@ function getTransactionDisplayIcon(transaction: LocalTransaction) {
 
   if (transaction.type === "income") {
     if (text.includes("freelance") || text.includes("project")) return "💼";
-    if (text.includes("business")) return "🏦";
-    if (text.includes("bonus")) return "🎉";
+    if (text.includes("business")) return "🏢";
+    if (text.includes("bonus")) return "🎁";
     if (text.includes("gift")) return "🎁";
     if (text.includes("refund") || text.includes("reimbursement")) return "↩️";
-    if (text.includes("interest") || text.includes("dividend")) return "📈";
+    if (text.includes("interest") || text.includes("dividend")) return "🏦";
 
-    return "💰";
+    return "💵";
   }
 
   if (
@@ -201,6 +332,7 @@ function getTransactionDisplayIcon(transaction: LocalTransaction) {
   if (text.includes("entertainment") || text.includes("movie")) return "🎬";
   if (text.includes("fitness") || text.includes("gym")) return "🏋️";
   if (text.includes("personal care") || text.includes("salon")) return "✨";
+
   if (text.includes("pet") || text.includes("cat") || text.includes("dog")) {
     return "🐾";
   }
@@ -224,7 +356,8 @@ function isIncomeTransaction(transaction: LocalTransaction) {
 
 function isSavingsTransaction(transaction: LocalTransaction) {
   return (
-    transaction.type === "savings" || transaction.type === "goal_contribution"
+    transaction.type === "savings" ||
+    transaction.type === "goal_contribution"
   );
 }
 
@@ -274,7 +407,6 @@ function getGroupedTransactions(transactions: LocalTransaction[]) {
     const key = parsedDate
       ? format(parsedDate, "yyyy-MM-dd")
       : transaction.date || "no-date";
-
     const title = parsedDate ? format(parsedDate, "EEEE") : "No date";
     const subtitle = parsedDate
       ? format(parsedDate, "MMM d, yyyy")
@@ -298,6 +430,188 @@ function getGroupedTransactions(transactions: LocalTransaction[]) {
   return Array.from(groups.values());
 }
 
+function TypeFilterDropdown({
+  value,
+  onChange,
+}: {
+  value: TransactionFilter;
+  onChange: (value: TransactionFilter) => void;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+
+  const selectedOption =
+    typeFilterOptions.find((option) => option.value === value) ??
+    typeFilterOptions[0];
+
+  const SelectedIcon = selectedOption.icon;
+
+  return (
+    <div
+      className="relative"
+      onBlur={(event) => {
+        const nextTarget = event.relatedTarget as Node | null;
+
+        if (!nextTarget || !event.currentTarget.contains(nextTarget)) {
+          setIsOpen(false);
+        }
+      }}
+    >
+      <span className="sr-only">Type filter</span>
+
+      <button
+        aria-expanded={isOpen}
+        aria-haspopup="listbox"
+        className="bc-input flex h-12 w-full items-center gap-2 !px-3 text-left"
+        onClick={() => setIsOpen((current) => !current)}
+        type="button"
+      >
+        <SelectedIcon
+          className={cn("h-4 w-4 shrink-0", selectedOption.className)}
+        />
+
+        <span className="min-w-0 flex-1 truncate text-sm font-black text-[var(--bc-text)]">
+          {selectedOption.label}
+        </span>
+
+        <ChevronDown
+          className={cn(
+            "h-4 w-4 shrink-0 text-[var(--bc-text-muted)] transition-transform",
+            isOpen ? "rotate-180" : "rotate-0",
+          )}
+        />
+      </button>
+
+      {isOpen ? (
+        <div
+          className="absolute left-0 top-[calc(100%+0.5rem)] z-50 w-full overflow-hidden rounded-2xl border border-[var(--bc-border-strong)] bg-[var(--bc-bg-deep)] p-1.5 shadow-[0_18px_42px_rgba(0,0,0,0.42)]"
+          role="listbox"
+        >
+          {typeFilterOptions.map((option) => {
+            const isSelected = option.value === value;
+            const OptionIcon = option.icon;
+
+            return (
+              <button
+                aria-selected={isSelected}
+                className={cn(
+                  "flex w-full items-center gap-2 rounded-xl px-2.5 py-2 text-left text-sm font-black transition",
+                  isSelected
+                    ? "bg-[var(--bc-green-glow)] text-[var(--bc-green)]"
+                    : "text-[var(--bc-text-soft)] hover:bg-[var(--bc-surface-soft)] hover:text-[var(--bc-text)]",
+                )}
+                key={option.value}
+                onClick={() => {
+                  onChange(option.value);
+                  setIsOpen(false);
+                }}
+                role="option"
+                type="button"
+              >
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-[var(--bc-border)] bg-[var(--bc-surface)]">
+                  <OptionIcon className={cn("h-4 w-4", option.className)} />
+                </span>
+
+                <span className="min-w-0 flex-1 truncate">{option.label}</span>
+
+                {isSelected ? <Check className="h-4 w-4 shrink-0" /> : null}
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function MonthFilterDropdown({
+  value,
+  onChange,
+}: {
+  value: MonthFilter;
+  onChange: (value: MonthFilter) => void;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+
+  const options = useMemo(() => getMonthFilterOptions(), []);
+  const selectedOption = getMonthFilterOptionFromValue(value);
+  const SelectedIcon = selectedOption.icon;
+
+  return (
+    <div
+      className="relative"
+      onBlur={(event) => {
+        const nextTarget = event.relatedTarget as Node | null;
+
+        if (!nextTarget || !event.currentTarget.contains(nextTarget)) {
+          setIsOpen(false);
+        }
+      }}
+    >
+      <span className="sr-only">Month filter</span>
+
+      <button
+        aria-expanded={isOpen}
+        aria-haspopup="listbox"
+        className="bc-input flex h-12 w-full items-center gap-2 !px-3 text-left"
+        onClick={() => setIsOpen((current) => !current)}
+        type="button"
+      >
+        <SelectedIcon className="h-4 w-4 shrink-0 text-[var(--bc-text-muted)]" />
+
+        <span className="min-w-0 flex-1 truncate text-sm font-black text-[var(--bc-text)]">
+          {selectedOption.shortLabel}
+        </span>
+
+        <ChevronDown
+          className={cn(
+            "h-4 w-4 shrink-0 text-[var(--bc-text-muted)] transition-transform",
+            isOpen ? "rotate-180" : "rotate-0",
+          )}
+        />
+      </button>
+
+      {isOpen ? (
+        <div
+          className="absolute right-0 top-[calc(100%+0.5rem)] z-50 max-h-72 w-full overflow-y-auto rounded-2xl border border-[var(--bc-border-strong)] bg-[var(--bc-bg-deep)] p-1.5 shadow-[0_18px_42px_rgba(0,0,0,0.42)]"
+          role="listbox"
+        >
+          {options.map((option) => {
+            const isSelected = option.value === value;
+            const OptionIcon = option.icon;
+
+            return (
+              <button
+                aria-selected={isSelected}
+                className={cn(
+                  "flex w-full items-center gap-2 rounded-xl px-2.5 py-2 text-left text-sm font-black transition",
+                  isSelected
+                    ? "bg-[var(--bc-green-glow)] text-[var(--bc-green)]"
+                    : "text-[var(--bc-text-soft)] hover:bg-[var(--bc-surface-soft)] hover:text-[var(--bc-text)]",
+                )}
+                key={option.value}
+                onClick={() => {
+                  onChange(option.value);
+                  setIsOpen(false);
+                }}
+                role="option"
+                type="button"
+              >
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-[var(--bc-border)] bg-[var(--bc-surface)]">
+                  <OptionIcon className="h-4 w-4" />
+                </span>
+
+                <span className="min-w-0 flex-1 truncate">{option.label}</span>
+
+                {isSelected ? <Check className="h-4 w-4 shrink-0" /> : null}
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function TransactionRow({
   transaction,
   onEdit,
@@ -310,8 +624,7 @@ function TransactionRow({
 
   return (
     <button
-      className="group flex w-full items-center gap-3 rounded-[20px] border border-[var(--bc-border)] bg-[var(--bc-surface-soft)]/60 p-3 text-left transition hover:border-[var(--bc-border-strong)] hover:bg-[var(--bc-card)]"
-      onClick={() => onEdit(transaction)}
+className="group flex w-full items-center gap-3.5 rounded-[22px] border border-[var(--bc-border)] bg-[var(--bc-surface-soft)]/60 p-3.5 text-left transition hover:border-[var(--bc-border-strong)] hover:bg-[var(--bc-card)]"      onClick={() => onEdit(transaction)}
       type="button"
     >
       <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-[var(--bc-border)] bg-[var(--bc-card)] text-xl shadow-sm">
@@ -358,9 +671,9 @@ function TransactionRow({
           {formatCurrency(transaction.amount)}
         </p>
 
-        <span className="mt-1 inline-flex items-center gap-1 text-[10px] font-black text-[var(--bc-text-muted)] opacity-80 transition group-hover:text-[var(--bc-green)]">
-          Edit
+        <span className="mt-1 inline-flex items-center gap-1 text-[10px] font-bold text-[var(--bc-text-muted)] opacity-70 transition group-hover:opacity-100">
           <Pencil className="h-3 w-3" />
+          Edit
         </span>
       </div>
     </button>
@@ -373,7 +686,9 @@ export function Transactions() {
 
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState<TransactionFilter>("all");
-  const [monthFilter, setMonthFilter] = useState<MonthFilter>("this_month");
+  const [monthFilter, setMonthFilter] = useState<MonthFilter>(() =>
+    getMonthFilterValue(),
+  );
   const [mobileMonthFallbackApplied, setMobileMonthFallbackApplied] =
     useState(false);
   const [editingTransaction, setEditingTransaction] =
@@ -392,8 +707,7 @@ export function Transactions() {
     ) ?? [];
 
   const filteredTransactions = useMemo(() => {
-    const now = new Date();
-    const monthInterval = getMonthInterval(monthFilter, now);
+    const monthInterval = getMonthInterval(monthFilter);
     const normalizedSearch = search
       .normalize("NFKD")
       .replace(/[\u0300-\u036f]/g, "")
@@ -431,11 +745,15 @@ export function Transactions() {
   useEffect(() => {
     if (mobileMonthFallbackApplied) return;
     if (window.innerWidth >= 768) return;
-    if (monthFilter !== "this_month") return;
+
+    const currentMonthFilter = getMonthFilterValue();
+
+    if (monthFilter !== currentMonthFilter) return;
     if (transactions.length === 0) return;
 
-    const currentMonthInterval = getMonthInterval("this_month");
-    const lastMonthInterval = getMonthInterval("last_month");
+    const currentMonthInterval = getMonthInterval(currentMonthFilter);
+    const lastMonthFilter = getMonthFilterValue(subMonths(new Date(), 1));
+    const lastMonthInterval = getMonthInterval(lastMonthFilter);
 
     const hasCurrentMonthTransactions = transactions.some((transaction) => {
       const parsedDate = safeDate(transaction.date);
@@ -455,7 +773,7 @@ export function Transactions() {
         : false;
     });
 
-    setMonthFilter(hasLastMonthTransactions ? "last_month" : "all_time");
+    setMonthFilter(hasLastMonthTransactions ? lastMonthFilter : "all_time");
     setMobileMonthFallbackApplied(true);
   }, [mobileMonthFallbackApplied, monthFilter, transactions]);
 
@@ -480,158 +798,124 @@ export function Transactions() {
         summary.expenses += Number(transaction.amount || 0);
         return summary;
       },
-      {
-        income: 0,
-        expenses: 0,
-        savings: 0,
-      },
+      { income: 0, expenses: 0, savings: 0 },
     );
   }, [filteredTransactions]);
 
   return (
     <>
-      <div className="mx-auto min-h-screen w-full max-w-[430px] px-5 pb-28 pt-5 md:max-w-none md:px-0 md:pb-8 md:pt-0">
-        <header className="mb-5 flex items-center justify-between gap-4">
-          <div className="min-w-0">
-            <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[var(--bc-text-muted)]">
+<section className="space-y-6 px-5 pt-6 pb-28 md:px-0 md:pt-0 md:pb-0">        
+<header className="flex items-start justify-between gap-4 pt-1">          
+  <div>
+            <p className="text-[11px] font-black uppercase tracking-[0.28em] text-[var(--bc-text-muted)]">
               Ledger
             </p>
-            <h1 className="mt-1 text-2xl font-black tracking-[-0.05em] text-[var(--bc-text)] md:text-3xl">
+
+            <h1 className="mt-1 text-2xl font-black tracking-[-0.05em] text-[var(--bc-text)]">
               Transactions
             </h1>
-            <p className="mt-1 text-sm font-semibold text-[var(--bc-text-muted)]">
+
+            <p className="mt-1 text-sm font-semibold text-[var(--bc-text-soft)]">
               Your entries are saved instantly
             </p>
           </div>
 
           <AddTransactionDialog
-            ariaLabel="Add transaction"
-            className="bc-button bc-button-primary h-11 min-h-11 rounded-2xl px-4"
-            compact
-            label="Add"
-          />
+  className="bc-button bc-button-primary mt-0.5 h-12 rounded-[20px] px-5 text-sm shadow-[0_12px_26px_var(--bc-green-glow)]"
+  label="Add"
+/>
         </header>
 
-        <section className="bc-card-elevated mb-4 overflow-hidden p-4">
-          <div className="flex items-start justify-between gap-3">
+        <section className="bc-card p-4">
+          <div className="flex items-center justify-between gap-3">
             <div>
-              <div className="bc-icon-circle-green mb-3 flex h-11 w-11 items-center justify-center rounded-full">
-                <WalletCards className="h-5 w-5" />
-              </div>
-
-              <p className="text-sm font-black text-[var(--bc-text)]">
+              <p className="text-[11px] font-black uppercase tracking-[0.22em] text-[var(--bc-text-muted)]">
                 Money movement
               </p>
-              <p className="mt-1 text-xs font-semibold text-[var(--bc-text-muted)]">
+
+              <p className="mt-1 text-sm font-semibold text-[var(--bc-text-soft)]">
                 {filteredTransactions.length} transaction
                 {filteredTransactions.length === 1 ? "" : "s"} in this view
               </p>
             </div>
 
-            <span className="rounded-full border border-[var(--bc-border)] bg-[var(--bc-card)] px-3 py-1 text-xs font-black text-[var(--bc-green)]">
-              {monthLabels[monthFilter]}
-            </span>
+            <div className="rounded-full border border-[var(--bc-border)] bg-[var(--bc-surface)] px-3 py-1 text-[11px] font-black text-[var(--bc-green)]">
+              {getMonthFilterLabel(monthFilter)}
+            </div>
           </div>
 
-          <div className="mt-4 grid grid-cols-3 gap-2">
-            <div className="rounded-[18px] border border-[var(--bc-green)]/15 bg-[var(--bc-green-glow)] p-3">
-              <p className="text-[10px] font-black uppercase tracking-[0.08em] text-[var(--bc-text-muted)]">
+          <div className="mt-5 grid grid-cols-3 gap-3">
+            <div className="rounded-2xl border border-[var(--bc-green)]/20 bg-[var(--bc-green-glow)] p-4">
+              <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[var(--bc-text-muted)]">
                 Income
               </p>
-              <p className="mt-2 truncate text-sm font-black text-[var(--bc-green)]">
+
+              <p className="mt-1 truncate text-sm font-black text-[var(--bc-green)]">
                 {formatCurrency(totals.income)}
               </p>
             </div>
 
-            <div className="rounded-[18px] border border-[var(--bc-red)]/15 bg-[var(--bc-red-glow)] p-3">
-              <p className="text-[10px] font-black uppercase tracking-[0.08em] text-[var(--bc-text-muted)]">
+            <div className="rounded-2xl border border-[var(--bc-red)]/20 bg-[var(--bc-red-glow)] p-4">
+              <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[var(--bc-text-muted)]">
                 Expenses
               </p>
-              <p className="mt-2 truncate text-sm font-black text-[var(--bc-red)]">
+
+              <p className="mt-1 truncate text-sm font-black text-[var(--bc-red)]">
                 {formatCurrency(totals.expenses)}
               </p>
             </div>
 
-            <div className="rounded-[18px] border border-[var(--bc-blue)]/15 bg-[var(--bc-blue)]/10 p-3">
-              <p className="text-[10px] font-black uppercase tracking-[0.08em] text-[var(--bc-text-muted)]">
+            <div className="rounded-2xl border border-[var(--bc-blue)]/20 bg-[var(--bc-blue)]/10 p-4">
+              <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[var(--bc-text-muted)]">
                 Savings
               </p>
-              <p className="mt-2 truncate text-sm font-black text-[var(--bc-blue)]">
+
+              <p className="mt-1 truncate text-sm font-black text-[var(--bc-blue)]">
                 {formatCurrency(totals.savings)}
               </p>
             </div>
           </div>
         </section>
 
-        <section className="bc-card mb-4 p-3">
-          <div className="relative">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--bc-text-muted)]" />
+<section className="bc-card relative z-20 mb-5 overflow-visible rounded-[28px] p-4">
+            <div className="relative">
+            <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--bc-text-muted)]" />
+
             <input
-              className="bc-input pl-10"
+              className="bc-input !pl-11 !pr-4 text-left"
               onChange={(event) => setSearch(event.target.value)}
               placeholder="Search transactions"
               value={search}
             />
           </div>
 
-          <div className="mt-3 grid grid-cols-2 gap-2">
-            <label className="relative">
-              <span className="sr-only">Type filter</span>
-              <Filter className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--bc-text-muted)]" />
-              <select
-                className="bc-input appearance-none pl-10"
-                onChange={(event) =>
-                  setTypeFilter(event.target.value as TransactionFilter)
-                }
-                value={typeFilter}
-              >
-                {Object.entries(filterTypeLabels).map(([value, label]) => (
-                  <option key={value} value={value}>
-                    {label}
-                  </option>
-                ))}
-              </select>
-            </label>
+          <div className="mt-3.5 grid grid-cols-2 gap-3">
+            <TypeFilterDropdown
+              value={typeFilter}
+              onChange={setTypeFilter}
+            />
 
-            <label className="relative">
-              <span className="sr-only">Month filter</span>
-              <CalendarDays className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--bc-text-muted)]" />
-              <select
-                className="bc-input appearance-none pl-10"
-                onChange={(event) =>
-                  setMonthFilter(event.target.value as MonthFilter)
-                }
-                value={monthFilter}
-              >
-                {Object.entries(monthLabels).map(([value, label]) => (
-                  <option key={value} value={value}>
-                    {label}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <MonthFilterDropdown
+              value={monthFilter}
+              onChange={setMonthFilter}
+            />
           </div>
         </section>
 
-        <section className="space-y-4">
+        <section className="space-y-5">
           {groupedTransactions.map((group) => (
-            <article key={group.key}>
-              <div className="mb-2 flex items-end justify-between gap-3 px-1">
-                <div>
+            <div className="space-y-2" key={group.key}>
+<div className="px-1 pt-1">
                   <h2 className="text-sm font-black text-[var(--bc-text)]">
-                    {group.title}
-                  </h2>
-                  <p className="text-[11px] font-semibold text-[var(--bc-text-muted)]">
-                    {group.subtitle}
-                  </p>
-                </div>
+                  {group.title}
+                </h2>
 
-                <span className="rounded-full border border-[var(--bc-border)] bg-[var(--bc-card)] px-2.5 py-1 text-[10px] font-black text-[var(--bc-text-muted)]">
-                  {group.transactions.length}
-                </span>
+                <p className="text-[11px] font-semibold text-[var(--bc-text-muted)]">
+                  {group.subtitle}
+                </p>
               </div>
 
-              <div className="space-y-2">
+              <div className="space-y-3">
                 {group.transactions.map((transaction) => (
                   <TransactionRow
                     key={transaction.id}
@@ -640,34 +924,27 @@ export function Transactions() {
                   />
                 ))}
               </div>
-            </article>
+            </div>
           ))}
 
           {filteredTransactions.length === 0 && (
-            <div className="bc-card p-8 text-center">
-              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full border border-[var(--bc-border)] bg-[var(--bc-green-glow)] text-[var(--bc-green)]">
-                <Search className="h-6 w-6" />
+            <div className="bc-card-elevated flex flex-col items-center justify-center px-6 py-12 text-center">
+              <div className="flex h-14 w-14 items-center justify-center rounded-full border border-[var(--bc-border)] bg-[var(--bc-surface-soft)] text-[var(--bc-green)]">
+                <WalletCards className="h-6 w-6" />
               </div>
 
               <h2 className="mt-4 text-lg font-black text-[var(--bc-text)]">
                 No transactions found
               </h2>
-              <p className="mx-auto mt-2 max-w-sm text-sm font-semibold leading-relaxed text-[var(--bc-text-muted)]">
+
+              <p className="mt-2 max-w-xs text-sm font-semibold leading-relaxed text-[var(--bc-text-muted)]">
                 Try a different filter, search another keyword, or add your
                 first transaction for this period.
               </p>
-
-              <div className="mt-5 flex justify-center">
-                <AddTransactionDialog
-                  ariaLabel="Add transaction"
-                  className="bc-button bc-button-primary"
-                  label="Add Transaction"
-                />
-              </div>
             </div>
           )}
         </section>
-      </div>
+      </section>
 
       <EditTransactionModal
         onClose={() => setEditingTransaction(null)}
@@ -797,46 +1074,86 @@ function EditTransactionModal({
 
   if (!transaction) return null;
 
-  const amountTone = getAmountTone(transaction);
+  const isPositive = type === "income" || type === "salary";
+  const isSavings = type === "savings" || type === "goal_contribution";
+  const amountNumber = Number(amount || transaction.amount || 0);
+
+  const previewTransaction: LocalTransaction = {
+    ...transaction,
+    type,
+    amount: amountNumber,
+    category: category || transaction.category,
+    date: date || transaction.date,
+    payment_method: normalizePaymentMethod(
+      paymentMethod || transaction.payment_method,
+    ),
+    note,
+  };
+
+  const displayIcon = getTransactionDisplayIcon(previewTransaction);
+  const displayCategory = getCategoryLabel(category || transaction.category);
+  const displayPayment = getPaymentMethodLabel(
+    paymentMethod || transaction.payment_method,
+  );
+
+  let displayDate = date || transaction.date;
+
+  try {
+    displayDate = format(parseISO(date || transaction.date), "MMM d, yyyy");
+  } catch {
+    displayDate = date || transaction.date;
+  }
+
+  const fieldLabelClass =
+    "space-y-1.5 text-[11px] font-black text-[var(--bc-text)]";
+
+  const fieldClass =
+    "h-10 w-full rounded-2xl border border-[var(--bc-border-strong)] bg-[var(--bc-surface)] px-3 text-sm font-semibold text-[var(--bc-text)] outline-none transition focus:border-[var(--bc-green)]";
 
   return (
-    <Modal isOpen={Boolean(transaction)} onClose={onClose} title="Transaction Details">
-      <form className="space-y-5" onSubmit={handleSave}>
-        <div className="rounded-[24px] border border-[var(--bc-border)] bg-[var(--bc-surface-soft)]/70 p-4 text-center">
-          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full border border-[var(--bc-border)] bg-[var(--bc-card)] text-3xl">
-            {getTransactionDisplayIcon(transaction)}
-          </div>
+   <Modal
+  className="max-w-[355px] overflow-hidden rounded-[32px] pb-2 sm:max-w-lg"
+  isOpen={Boolean(transaction)}
+  onClose={onClose}
+  title="Transaction Details"
+>
+      <form className="space-y-3 pb-2" onSubmit={handleSave}>
+    <section className="bc-card-elevated flex min-h-[184px] flex-col items-center justify-center rounded-[28px] border border-[var(--bc-border-strong)] bg-[var(--bc-card-elevated)] px-5 py-5 text-center shadow-none">
+  <div className="flex h-[58px] w-[58px] items-center justify-center rounded-full border border-[var(--bc-border-strong)] bg-[var(--bc-card)] text-[28px] shadow-none">
+    {displayIcon}
+  </div>
 
-          <p className="mt-3 text-sm font-black text-[var(--bc-text-muted)]">
-            {getCategoryLabel(transaction.category)}
-          </p>
+  <p className="mt-4 max-w-full truncate text-base font-black text-[var(--bc-text)]">
+    {displayCategory}
+  </p>
 
-          <p
-            className={cn(
-              "mt-1 text-3xl font-black tracking-[-0.06em]",
-              amountTone.className,
-            )}
-          >
-            {amountTone.sign}
-            {formatCurrency(transaction.amount)}
-          </p>
+  <p
+    className={cn(
+      "mt-2 flex max-w-full items-baseline justify-center gap-0.5 truncate text-[28px] font-black leading-none tracking-[-0.035em]",
+      isPositive
+        ? "text-[var(--bc-green)]"
+        : isSavings
+          ? "text-[var(--bc-blue)]"
+          : "text-[var(--bc-red)]",
+    )}
+  >
+    <span className="text-[22px] leading-none">
+      {isPositive ? "+" : "-"}
+    </span>
+    <span>{formatCurrency(amountNumber)}</span>
+  </p>
 
-          <p className="mt-1 text-xs font-semibold text-[var(--bc-text-muted)]">
-            {formatTransactionDate(transaction.date)} •{" "}
-            {getPaymentMethodLabel(transaction.payment_method)}
-          </p>
-        </div>
+  <p className="mt-3 max-w-full truncate text-xs font-semibold text-[var(--bc-text-muted)]">
+    {displayDate} • {displayPayment}
+  </p>
+</section>
 
-        <div className="grid gap-4 sm:grid-cols-2">
-          <label className="space-y-2">
-            <span className="text-xs font-black text-[var(--bc-text-soft)]">
-              Type
-            </span>
+        <section className="grid grid-cols-2 gap-x-2.5 gap-y-3">
+          <label className={fieldLabelClass}>
+            Type
             <select
-              className="bc-input"
-              onChange={(event) =>
-                setType(event.target.value as TransactionType)
-              }
+              className={fieldClass}
+              onChange={(event) => setType(event.target.value as TransactionType)}
               value={type}
             >
               {Object.entries(typeLabels).map(([value, label]) => (
@@ -847,12 +1164,10 @@ function EditTransactionModal({
             </select>
           </label>
 
-          <label className="space-y-2">
-            <span className="text-xs font-black text-[var(--bc-text-soft)]">
-              Amount
-            </span>
+          <label className={fieldLabelClass}>
+            Amount
             <input
-              className="bc-input"
+              className={fieldClass}
               onChange={(event) => setAmount(event.target.value)}
               required
               type="number"
@@ -860,12 +1175,10 @@ function EditTransactionModal({
             />
           </label>
 
-          <label className="space-y-2">
-            <span className="text-xs font-black text-[var(--bc-text-soft)]">
-              Category
-            </span>
+          <label className={fieldLabelClass}>
+            Category
             <select
-              className="bc-input"
+              className={fieldClass}
               onChange={(event) => setCategory(event.target.value)}
               value={category}
             >
@@ -875,9 +1188,7 @@ function EditTransactionModal({
                 !categoryOptions.some(
                   (categoryOption) => categoryOption.id === category,
                 ) && (
-                  <option value={category}>
-                    {getCategoryLabel(category)}
-                  </option>
+                  <option value={category}>{getCategoryLabel(category)}</option>
                 )}
 
               {categoryOptions.map((categoryOption) => (
@@ -888,24 +1199,20 @@ function EditTransactionModal({
             </select>
           </label>
 
-          <label className="space-y-2">
-            <span className="text-xs font-black text-[var(--bc-text-soft)]">
-              Date
-            </span>
+          <label className={fieldLabelClass}>
+            Date
             <input
-              className="bc-input"
+              className={fieldClass}
               onChange={(event) => setDate(event.target.value)}
               type="date"
               value={date}
             />
           </label>
 
-          <label className="space-y-2 sm:col-span-2">
-            <span className="text-xs font-black text-[var(--bc-text-soft)]">
-              Payment Method
-            </span>
+          <label className={fieldLabelClass}>
+            Payment
             <select
-              className="bc-input"
+              className={fieldClass}
               onChange={(event) => setPaymentMethod(event.target.value)}
               value={paymentMethod}
             >
@@ -925,32 +1232,21 @@ function EditTransactionModal({
             </select>
           </label>
 
-          <label className="space-y-2 sm:col-span-2">
-            <span className="text-xs font-black text-[var(--bc-text-soft)]">
-              Note
-            </span>
-            <textarea
-              className="bc-input min-h-24 resize-none"
+          <label className={fieldLabelClass}>
+            Note
+            <input
+              className={fieldClass}
               onChange={(event) => setNote(event.target.value)}
-              placeholder="Optional details for future you"
+              placeholder="Optional"
               value={note}
             />
           </label>
-        </div>
+        </section>
 
-        <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <Button
-            disabled={isSaving}
-            onClick={handleDelete}
-            type="button"
-            variant="urgent"
-          >
-            <Trash2 size={18} />
-            Delete
-          </Button>
-
-          <div className="flex flex-col-reverse gap-3 sm:flex-row">
+        <div className="sticky bottom-0 z-10 -mx-1 space-y-2 rounded-b-[28px] border-t border-[var(--bc-border)] bg-[var(--bc-card)] px-1 pb-2 pt-3">
+          <div className="grid grid-cols-[0.95fr_1.3fr] gap-2">
             <Button
+              className="h-10 min-h-10 rounded-2xl border border-[var(--bc-border-strong)] bg-transparent text-xs font-black text-[var(--bc-text)] hover:bg-[var(--bc-surface-soft)]"
               disabled={isSaving}
               onClick={onClose}
               type="button"
@@ -959,7 +1255,11 @@ function EditTransactionModal({
               Cancel
             </Button>
 
-            <Button disabled={isSaving} type="submit">
+            <Button
+              className="h-10 min-h-10 rounded-2xl bg-[var(--bc-green)] text-xs font-black text-white shadow-[0_10px_24px_var(--bc-green-glow)] hover:bg-[var(--bc-green-soft)]"
+              disabled={isSaving}
+              type="submit"
+            >
               {isSaving && (
                 <AnimatedStatusIcon
                   animation="spin"
@@ -971,6 +1271,17 @@ function EditTransactionModal({
               {isSaving ? "Saving..." : "Save Changes"}
             </Button>
           </div>
+
+          <Button
+            className="h-9 min-h-9 w-full rounded-2xl border border-[var(--bc-red)]/60 bg-[var(--bc-red-glow)] text-xs font-black text-[var(--bc-red)] hover:bg-[var(--bc-red-glow)]"
+            disabled={isSaving}
+            onClick={handleDelete}
+            type="button"
+            variant="urgent"
+          >
+            <Trash2 className="h-4 w-4" />
+            Delete Transaction
+          </Button>
         </div>
       </form>
     </Modal>

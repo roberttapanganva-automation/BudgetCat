@@ -46,7 +46,7 @@ export function Modal({
   return (
     <div
       aria-modal="true"
-      className="fixed inset-0 z-50 flex items-end bg-black/55 p-2 backdrop-blur-md sm:items-center sm:justify-center sm:p-5"
+     className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-2 backdrop-blur-md sm:p-5"
       onMouseDown={handleBackdropClick}
       role="dialog"
     >
