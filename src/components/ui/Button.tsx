@@ -1,4 +1,5 @@
 import { type ButtonHTMLAttributes, type ReactNode } from "react";
+
 import { cn } from "../../lib/utils";
 
 type ButtonVariant = "primary" | "secondary" | "ghost" | "urgent";
@@ -9,11 +10,14 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 const variants: Record<ButtonVariant, string> = {
-  primary: "bg-budget-primary text-white hover:bg-budget-primary/90",
+  primary:
+    "border-transparent bg-[linear-gradient(180deg,color-mix(in_srgb,var(--bc-green)_88%,white_12%),var(--bc-green-soft))] text-white shadow-[0_14px_30px_var(--bc-green-glow)] hover:brightness-105",
   secondary:
-    "border border-budget-border bg-budget-card text-budget-text hover:border-budget-primary/50 hover:bg-budget-background",
-  ghost: "text-budget-text hover:bg-budget-background",
-  urgent: "bg-budget-urgent text-white hover:bg-budget-urgent/90",
+    "border-[var(--bc-border)] bg-[var(--bc-card)] text-[var(--bc-text-soft)] hover:border-[var(--bc-border-strong)] hover:bg-[var(--bc-surface-soft)] hover:text-[var(--bc-text)]",
+  ghost:
+    "border-transparent bg-transparent text-[var(--bc-text-muted)] hover:bg-[var(--bc-surface-soft)] hover:text-[var(--bc-text)]",
+  urgent:
+    "border-[var(--bc-red)]/30 bg-[var(--bc-red-glow)] text-[var(--bc-red)] hover:bg-[var(--bc-red)] hover:text-white",
 };
 
 export function Button({
@@ -27,7 +31,7 @@ export function Button({
     <button
       type={type}
       className={cn(
-        "inline-flex min-h-11 items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60",
+        "inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl border px-4 py-2 text-sm font-black leading-none transition duration-200 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60",
         variants[variant],
         className,
       )}

@@ -4,11 +4,11 @@ import { cn } from "../../lib/utils";
 type BadgeTone = "neutral" | "success" | "warning" | "urgent" | "cat";
 
 const tones: Record<BadgeTone, string> = {
-  neutral: "bg-budget-background text-budget-text",
-  success: "bg-budget-success/12 text-budget-success",
-  warning: "bg-budget-warning/20 text-budget-text",
-  urgent: "bg-budget-urgent/12 text-budget-urgent",
-  cat: "bg-budget-cat/18 text-budget-text",
+  neutral: "bg-[var(--bc-surface-soft)] text-[var(--bc-text)] border border-[var(--bc-border)]",
+  success: "bg-[color-mix(in_srgb,var(--bc-green)_12%,transparent)] text-[var(--bc-green)]",
+  warning: "bg-[color-mix(in_srgb,var(--bc-amber)_20%,transparent)] text-[var(--bc-amber)]",
+  urgent: "bg-[color-mix(in_srgb,var(--bc-red)_12%,transparent)] text-[var(--bc-red)]",
+  cat: "bg-[color-mix(in_srgb,var(--bc-blue)_18%,transparent)] text-[var(--bc-blue)]",
 };
 
 export function Badge({

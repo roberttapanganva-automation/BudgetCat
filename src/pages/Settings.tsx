@@ -1,24 +1,32 @@
 import { useLiveQuery } from "dexie-react-hooks";
 import {
+  AlertTriangle,
   Bell,
+  CheckCircle2,
+  ChevronRight,
+  Database,
   Download,
   FileDown,
+  Loader2,
   LogOut,
+  Moon,
   Palette,
   RefreshCcw,
+  Settings as SettingsIcon,
+  ShieldCheck,
   Smartphone,
+  Sun,
   Trash2,
   UserRound,
   Volume2,
+  VolumeX,
 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { PageHeader } from "../components/dashboard/PageHeader";
-import { SyncStatusIndicator } from "../components/layout/SyncStatusIndicator";
+
 import { ThemeToggle } from "../components/layout/ThemeToggle";
-import { Badge } from "../components/ui/Badge";
-import { Button } from "../components/ui/Button";
-import { Card } from "../components/ui/Card";
+import { AnimatedStatusIcon } from "../components/ui/AnimatedStatusIcon";
 import { useAuth } from "../contexts/AuthContext";
+import { useSyncStatus } from "../hooks/useSyncStatus";
 import { exportBudgetCatData } from "../lib/exportData";
 import { clearLocalTestData, db } from "../lib/localDb";
 import { getStoredNickname, saveNickname } from "../lib/nickname";
@@ -45,7 +53,7 @@ import {
   syncErrorEventName,
 } from "../lib/syncErrorStore";
 import { syncPendingRecords } from "../lib/syncEngine";
-import { useSyncStatus } from "../hooks/useSyncStatus";
+import { cn } from "../lib/utils";
 import type {
   BudgetCatSyncError,
   ExportType,
@@ -53,24 +61,196 @@ import type {
   ReminderSoundMode,
 } from "../types/finance";
 
+const warmDashboardKey = "budgetcat-warm-dashboard";
+const mascotReminderKey = "budgetcat-show-mascot-reminders";
+
+type MessageTone = "success" | "warning" | "error" | "info";
+
+function getStoredBoolean(key: string, fallback: boolean) {
+  const storedValue = localStorage.getItem(key);
+
+  if (storedValue === "true") return true;
+  if (storedValue === "false") return false;
+
+  return fallback;
+}
+
+function saveStoredBoolean(key: string, value: boolean) {
+  localStorage.setItem(key, String(value));
+}
+
+function MessageBox({
+  message,
+  tone = "info",
+}: {
+  message: string | null;
+  tone?: MessageTone;
+}) {
+  if (!message) return null;
+
+  const toneClass = {
+    success: "border-[var(--bc-green)]/20 bg-[var(--bc-green-glow)] text-[var(--bc-green)]",
+    warning: "border-[var(--bc-amber)]/20 bg-[var(--bc-amber-glow)] text-[var(--bc-amber)]",
+    error: "border-[var(--bc-red)]/20 bg-[var(--bc-red-glow)] text-[var(--bc-red)]",
+    info: "border-[var(--bc-blue)]/20 bg-[var(--bc-blue)]/10 text-[var(--bc-blue)]",
+  }[tone];
+
+  return (
+    <div className={cn("mt-3 rounded-2xl border px-3 py-2", toneClass)}>
+      <p className="text-xs font-bold leading-relaxed">{message}</p>
+    </div>
+  );
+}
+
+function SectionTitle({
+  title,
+  subtitle,
+  icon: Icon,
+  tone = "green",
+}: {
+  title: string;
+  subtitle?: string;
+  icon: typeof SettingsIcon;
+  tone?: "green" | "amber" | "red" | "blue" | "purple";
+}) {
+  const iconClass = {
+    green: "bc-icon-circle-green",
+    amber: "bc-icon-circle-amber",
+    red: "bc-icon-circle-red",
+    blue: "bc-icon-circle-blue",
+    purple: "bg-[var(--bc-purple)]/15 text-[var(--bc-purple)]",
+  }[tone];
+
+  return (
+    <div className="mb-4 flex items-start gap-3">
+      <div className={cn("bc-icon-circle h-11 w-11 shrink-0", iconClass)}>
+        <Icon className="h-5 w-5" strokeWidth={2.4} />
+      </div>
+
+      <div className="min-w-0">
+        <h2 className="text-base font-black tracking-[-0.02em] text-[var(--bc-text)]">
+          {title}
+        </h2>
+        {subtitle ? (
+          <p className="mt-1 text-xs font-semibold leading-relaxed text-[var(--bc-text-muted)]">
+            {subtitle}
+          </p>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function ToggleRow({
+  title,
+  description,
+  checked,
+  onChange,
+}: {
+  title: string;
+  description: string;
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-4 rounded-[18px] border border-[var(--bc-border)] bg-[var(--bc-surface-soft)]/60 p-3">
+      <div className="min-w-0">
+        <p className="text-sm font-black text-[var(--bc-text)]">{title}</p>
+        <p className="mt-1 text-[11px] font-semibold leading-relaxed text-[var(--bc-text-muted)]">
+          {description}
+        </p>
+      </div>
+
+      <button
+        aria-pressed={checked}
+        className={cn(
+          "relative h-7 w-12 shrink-0 rounded-full border transition",
+          checked
+            ? "border-[var(--bc-green)]/30 bg-[var(--bc-green)]"
+            : "border-[var(--bc-border)] bg-[var(--bc-card)]",
+        )}
+        onClick={() => onChange(!checked)}
+        type="button"
+      >
+        <span
+          className={cn(
+            "absolute top-1 h-5 w-5 rounded-full bg-white shadow-sm transition",
+            checked ? "left-6" : "left-1",
+          )}
+        />
+      </button>
+    </div>
+  );
+}
+
+function ExportButton({
+  label,
+  description,
+  onClick,
+}: {
+  label: string;
+  description: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      className="flex w-full items-center gap-3 rounded-[18px] border border-[var(--bc-border)] bg-[var(--bc-surface-soft)]/60 p-3 text-left transition hover:border-[var(--bc-border-strong)] hover:bg-[var(--bc-card)]"
+      onClick={onClick}
+      type="button"
+    >
+      <div className="bc-icon-circle-blue h-10 w-10 shrink-0">
+        <FileDown className="h-4.5 w-4.5" />
+      </div>
+
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-black text-[var(--bc-text)]">{label}</p>
+        <p className="mt-1 text-[11px] font-semibold text-[var(--bc-text-muted)]">
+          {description}
+        </p>
+      </div>
+
+      <ChevronRight className="h-4 w-4 shrink-0 text-[var(--bc-text-muted)]" />
+    </button>
+  );
+}
+
 export function Settings() {
   const { signOut, user } = useAuth();
+
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
   const [latestSyncError, setDisplayedSyncError] =
     useState<BudgetCatSyncError | null>(() => getLatestSyncError());
   const [notificationStatus, setNotificationStatus] =
     useState<NotificationStatus>(() => getNotificationPermission());
-  const [notificationMessage, setNotificationMessage] = useState<string | null>(null);
+  const [notificationMessage, setNotificationMessage] = useState<string | null>(
+    null,
+  );
   const [exportMessage, setExportMessage] = useState<string | null>(null);
   const [nickname, setNickname] = useState(() => getStoredNickname(user?.id));
   const [nicknameMessage, setNicknameMessage] = useState<string | null>(null);
-  const [soundMode, setSoundMode] = useState<ReminderSoundMode>(() => getReminderSoundMode());
-  const [canInstallPwa, setCanInstallPwa] = useState(() => canPromptPwaInstall());
+  const [soundMode, setSoundMode] = useState<ReminderSoundMode>(() =>
+    getReminderSoundMode(),
+  );
+  const [canInstallPwa, setCanInstallPwa] = useState(() =>
+    canPromptPwaInstall(),
+  );
   const [pwaMessage, setPwaMessage] = useState<string | null>(null);
+  const [warmDashboard, setWarmDashboard] = useState(() =>
+    getStoredBoolean(warmDashboardKey, true),
+  );
+  const [showMascotReminders, setShowMascotReminders] = useState(() =>
+    getStoredBoolean(mascotReminderKey, true),
+  );
+
   const syncStatus = useSyncStatus();
+
   const pendingCount =
     useLiveQuery(
-      () => db.sync_queue.where("sync_status").anyOf(["pending", "failed"]).count(),
+      () =>
+        db.sync_queue
+          .where("sync_status")
+          .anyOf(["pending", "failed"])
+          .count(),
       [],
       0,
     ) ?? 0;
@@ -81,6 +261,7 @@ export function Settings() {
     };
 
     window.addEventListener(syncErrorEventName, handleSyncError);
+
     return () => window.removeEventListener(syncErrorEventName, handleSyncError);
   }, []);
 
@@ -94,36 +275,17 @@ export function Settings() {
     });
   }, []);
 
-  const sections = [
-    {
-      title: "Profile",
-      description: user?.email ?? "Local BudgetCat user",
-      icon: UserRound,
-      meta: user?.isOffline ? "Offline user" : "Supabase user",
-    },
-    {
-      title: "Currency",
-      description: "Default currency for all manual entries.",
-      icon: Palette,
-      meta: "PHP",
-    },
-    {
-      title: "Export Data",
-      description: "Download local backup files from this device.",
-      icon: Download,
-      meta: "Available",
-    },
-  ];
-
   async function handleSyncNow() {
     if (!hasSupabaseConfig) {
       setSyncMessage("Supabase is not configured. BudgetCat is in offline-only mode.");
       return;
     }
+
     if (!user) {
       setSyncMessage("No signed-in user for sync.");
       return;
     }
+
     if (!user.householdId) {
       setSyncMessage("No household found for sync. Check the latest sync error below.");
       setDisplayedSyncError(getLatestSyncError());
@@ -131,12 +293,15 @@ export function Settings() {
     }
 
     const result = await syncPendingRecords(user);
+
     setDisplayedSyncError(result.latestError ?? getLatestSyncError());
     setSyncMessage(
       result.skippedReason ??
         (result.ok
           ? `Synced ${result.synced} record${result.synced === 1 ? "" : "s"}.`
-          : `Synced ${result.synced} record${result.synced === 1 ? "" : "s"}; ${result.failed} failed.`),
+          : `Synced ${result.synced} record${
+              result.synced === 1 ? "" : "s"
+            }; ${result.failed} failed.`),
     );
   }
 
@@ -152,6 +317,7 @@ export function Settings() {
     if (!shouldClear) return;
 
     await clearLocalTestData();
+
     setSyncMessage("Local offline test records cleared. Supabase data was not changed.");
     setLatestSyncError(null);
     setDisplayedSyncError(null);
@@ -165,6 +331,7 @@ export function Settings() {
     }
 
     const permission = await requestNotificationPermission();
+
     setNotificationStatus(permission);
     setNotificationMessage(
       permission === "granted"
@@ -178,6 +345,7 @@ export function Settings() {
       .then(async (result) => {
         setNotificationStatus(result.permission);
         setNotificationMessage(result.message);
+
         if (result.ok) {
           await playReminderSound();
         }
@@ -193,6 +361,10 @@ export function Settings() {
     setReminderSoundMode(mode);
   }
 
+  async function handleTestSound() {
+    await playReminderSound(soundMode);
+  }
+
   async function handleTestMeowSound() {
     setSoundMode("meow");
     setReminderSoundMode("meow");
@@ -201,6 +373,7 @@ export function Settings() {
 
   async function handleInstallPwa() {
     const outcome = await promptPwaInstall();
+
     if (outcome === "accepted") {
       setPwaMessage("BudgetCat install started.");
     } else if (outcome === "dismissed") {
@@ -208,6 +381,7 @@ export function Settings() {
     } else {
       setPwaMessage("Install prompt is not available yet. Use your browser install menu.");
     }
+
     setCanInstallPwa(canPromptPwaInstall());
   }
 
@@ -229,153 +403,330 @@ export function Settings() {
     }
   }
 
-  return (
-    <>
-      <div className="md:hidden space-y-4">
-        <section className="space-y-2">
-          <h1 className="text-2xl font-black text-budget-text">Settings</h1>
-          <p className="text-sm font-semibold leading-6 text-budget-text/65">
-            Personal app preferences and sync controls.
-          </p>
-        </section>
+  function handleWarmDashboardChange(value: boolean) {
+    setWarmDashboard(value);
+    saveStoredBoolean(warmDashboardKey, value);
+  }
 
-        <Card className="p-4">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <p className="text-xs font-black uppercase tracking-[0.16em] text-budget-text/55">
-                Profile
-              </p>
-              <h2 className="mt-1 text-lg font-black">Nickname</h2>
-              <p className="mt-1 text-sm font-semibold text-budget-text/60">
-                This is what Bonnie and Clyde will call you.
+  function handleMascotReminderChange(value: boolean) {
+    setShowMascotReminders(value);
+    saveStoredBoolean(mascotReminderKey, value);
+  }
+
+  const syncHealthy = !latestSyncError && pendingCount === 0;
+  const soundEnabled = soundMode !== "off";
+  const notificationHealthy = notificationStatus === "granted";
+
+  return (
+    <div className="mx-auto min-h-screen w-full max-w-[430px] px-5 pb-28 pt-5 md:max-w-none md:px-0 md:pb-8 md:pt-0">
+      <header className="mb-5 flex items-center justify-between gap-4">
+        <div className="min-w-0">
+          <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[var(--bc-text-muted)]">
+            Preferences
+          </p>
+          <h1 className="mt-1 text-2xl font-black tracking-[-0.05em] text-[var(--bc-text)] md:text-3xl">
+            Settings
+          </h1>
+          <p className="mt-1 text-sm font-semibold text-[var(--bc-text-muted)]">
+            Manage your preferences
+          </p>
+        </div>
+
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-[var(--bc-border)] bg-[var(--bc-card)] text-[var(--bc-green)]">
+          <SettingsIcon className="h-5 w-5" strokeWidth={2.4} />
+        </div>
+      </header>
+
+      <section className="bc-card-elevated mb-4 p-4">
+        <SectionTitle
+          icon={UserRound}
+          subtitle="This is what Bonnie and Clyde will call you."
+          title="Profile"
+        />
+
+        <div className="space-y-3">
+          <label className="block space-y-2">
+            <span className="text-xs font-black text-[var(--bc-text-soft)]">
+              Nickname
+            </span>
+            <input
+              className="bc-input"
+              onChange={(event) => setNickname(event.target.value)}
+              placeholder="Robert"
+              value={nickname}
+            />
+          </label>
+
+          <MessageBox message={nicknameMessage} tone="success" />
+
+          <div className="grid grid-cols-[1fr_auto] gap-3">
+            <button
+              className="bc-button bc-button-primary w-full"
+              onClick={handleSaveNickname}
+              type="button"
+            >
+              Save Nickname
+            </button>
+
+            <button
+              className="bc-button bc-button-danger px-4"
+              onClick={signOut}
+              type="button"
+            >
+              <LogOut className="h-4.5 w-4.5" />
+            </button>
+          </div>
+
+          <div className="rounded-[18px] border border-[var(--bc-border)] bg-[var(--bc-surface-soft)]/60 p-3">
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-xs font-black text-[var(--bc-text-muted)]">
+                Account
+              </span>
+              <span className="rounded-full border border-[var(--bc-border)] bg-[var(--bc-card)] px-2 py-1 text-[10px] font-black text-[var(--bc-text-soft)]">
+                {user?.isOffline ? "Offline" : "Supabase"}
+              </span>
+            </div>
+            <p className="mt-2 truncate text-sm font-bold text-[var(--bc-text)]">
+              {user?.email ?? "Local BudgetCat user"}
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section className="bc-card mb-4 p-4">
+        <SectionTitle
+          icon={Palette}
+          subtitle="Keep BudgetCat comfortable in dark or light mode."
+          title="Appearance"
+          tone="purple"
+        />
+
+        <div className="space-y-3">
+          <div className="flex items-center justify-between gap-4 rounded-[18px] border border-[var(--bc-border)] bg-[var(--bc-surface-soft)]/60 p-3">
+            <div className="min-w-0">
+              <p className="text-sm font-black text-[var(--bc-text)]">Theme</p>
+              <p className="mt-1 text-[11px] font-semibold text-[var(--bc-text-muted)]">
+                Switch between BudgetCat light and dark mode.
               </p>
             </div>
-            <Badge tone={user?.isOffline ? "warning" : "success"}>
-              {user?.isOffline ? "Offline" : "Supabase"}
-            </Badge>
+
+            <ThemeToggle className="h-11 w-11 rounded-2xl border border-[var(--bc-border)] bg-[var(--bc-card)] text-[var(--bc-text)]" />
           </div>
-          <input
-            className="budget-input mt-4"
-            onChange={(event) => setNickname(event.target.value)}
-            placeholder="Robert"
-            value={nickname}
+
+          <ToggleRow
+            checked={warmDashboard}
+            description="Keeps cards soft, cozy, and mascot-friendly."
+            onChange={handleWarmDashboardChange}
+            title="Warm dashboard"
           />
-          {nicknameMessage && (
-            <p className="mt-2 text-sm font-semibold text-budget-text/65">{nicknameMessage}</p>
-          )}
-          <Button className="mt-4 w-full" onClick={handleSaveNickname}>
-            Save Nickname
-          </Button>
-          <Button className="mt-3 w-full" onClick={signOut} variant="secondary">
-            <LogOut size={18} />
-            Log Out
-          </Button>
-        </Card>
 
-        <Card className="p-4">
-          <p className="text-xs font-black uppercase tracking-[0.16em] text-budget-text/55">
-            Appearance
-          </p>
-          <div className="mt-3 flex items-center justify-between gap-3 rounded-xl bg-budget-background p-3 text-sm font-bold">
-            Theme
-            <ThemeToggle />
-          </div>
-          <label className="mt-3 flex items-center justify-between gap-4 rounded-xl bg-budget-background p-3 text-sm font-bold">
-            Warm dashboard density
-            <input defaultChecked type="checkbox" />
-          </label>
-          <label className="mt-3 flex items-center justify-between gap-4 rounded-xl bg-budget-background p-3 text-sm font-bold">
-            Show mascot reminders
-            <input defaultChecked type="checkbox" />
-          </label>
-        </Card>
+          <ToggleRow
+            checked={showMascotReminders}
+            description="Show Bonnie and Clyde encouragement where supported."
+            onChange={handleMascotReminderChange}
+            title="Show mascot reminders"
+          />
+        </div>
+      </section>
 
-        <Card className="p-4">
-          <p className="text-xs font-black uppercase tracking-[0.16em] text-budget-text/55">
-            Sync
-          </p>
-          <div className="mt-3 grid gap-3">
-            <div className="rounded-xl bg-budget-background p-3">
-              <p className="text-sm font-black">Sync Status</p>
-              <p className="mt-1 text-sm font-semibold text-budget-text/55">
+      <section className="bc-card mb-4 p-4">
+        <SectionTitle
+          icon={Database}
+          subtitle="Offline-first changes sync when BudgetCat can reach Supabase."
+          title="Sync"
+          tone={syncHealthy ? "green" : "amber"}
+        />
+
+        <div className="rounded-[22px] border border-[var(--bc-border)] bg-[var(--bc-surface-soft)]/60 p-4">
+          <div className="flex items-start gap-3">
+            <div
+              className={cn(
+                "bc-icon-circle h-11 w-11 shrink-0",
+                syncHealthy ? "bc-icon-circle-green" : "bc-icon-circle-amber",
+              )}
+            >
+              {syncStatus.isSyncing ? (
+                <AnimatedStatusIcon
+                  animation="spin"
+                  className="text-[var(--bc-amber)]"
+                  icon={Loader2}
+                  label="Syncing"
+                />
+              ) : syncHealthy ? (
+                <CheckCircle2 className="h-5 w-5" />
+              ) : (
+                <RefreshCcw className="h-5 w-5" />
+              )}
+            </div>
+
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-black text-[var(--bc-text)]">
+                {syncHealthy ? "All synced" : "Sync needs review"}
+              </p>
+              <p className="mt-1 text-xs font-semibold text-[var(--bc-text-muted)]">
                 {pendingCount} pending local record{pendingCount === 1 ? "" : "s"}.
               </p>
+
               {syncStatus.isSyncing && (
                 <div className="mt-3">
-                  <div className="mb-2 flex items-center justify-between gap-3 text-xs font-black text-budget-text/55">
+                  <div className="mb-1 flex items-center justify-between text-[11px] font-bold text-[var(--bc-text-muted)]">
                     <span>{syncStatus.currentTable ?? "Syncing"}</span>
                     <span>{syncStatus.percentComplete}%</span>
                   </div>
-                  <div className="h-2 overflow-hidden rounded-full bg-budget-background ring-1 ring-budget-border">
+                  <div className="bc-progress-track">
                     <div
-                      className="h-full rounded-full bg-budget-primary transition-all duration-500 ease-out"
-                      style={{ width: `${syncStatus.percentComplete}%` }}
+                      className="bc-progress-fill"
+                      style={{
+                        width: `${Math.max(
+                          4,
+                          Math.min(100, syncStatus.percentComplete),
+                        )}%`,
+                      }}
                     />
                   </div>
                 </div>
               )}
-              {syncMessage && (
-                <p className="mt-2 text-sm font-semibold text-budget-text/65">{syncMessage}</p>
-              )}
-            </div>
-            {latestSyncError && (
-              <div className="rounded-xl border border-budget-urgent/30 bg-budget-urgent/10 p-3 text-sm">
-                <p className="font-black text-budget-urgent">
-                  Sync failed for {latestSyncError.tableName}
-                </p>
-                <p className="mt-1 font-semibold text-budget-text/70">{latestSyncError.message}</p>
-                {latestSyncError.code && (
-                  <p className="mt-1 text-xs font-semibold text-budget-text/50">
-                    Code: {latestSyncError.code}
-                  </p>
-                )}
-              </div>
-            )}
-            <div className="grid grid-cols-2 gap-3">
-              <Button onClick={handleSyncNow} variant="secondary">
-                <RefreshCcw size={18} />
-                Sync Now
-              </Button>
-              <Button onClick={handleRetryFailedSync} variant="secondary">
-                Retry Failed Sync
-              </Button>
+
+              <MessageBox message={syncMessage} tone={syncHealthy ? "success" : "warning"} />
             </div>
           </div>
-        </Card>
+        </div>
 
-        <Card className="p-4">
-          <p className="text-xs font-black uppercase tracking-[0.16em] text-budget-text/55">
-            Notifications
-          </p>
-          <div className="mt-3 flex flex-col gap-3">
-            <div className="rounded-xl bg-budget-background p-3">
-              <div className="flex items-center gap-3">
-                <Bell size={18} className="text-budget-primary" />
-                <div>
-                  <h2 className="text-sm font-black">Permission</h2>
-                  <p className="text-xs font-semibold text-budget-text/55">
-                    Status: {notificationStatus}
-                  </p>
-                </div>
+        {latestSyncError && (
+          <div className="mt-3 rounded-[20px] border border-[var(--bc-red)]/20 bg-[var(--bc-red-glow)] p-4">
+            <div className="flex items-start gap-3">
+              <div className="bc-icon-circle-red h-10 w-10 shrink-0">
+                <AlertTriangle className="h-4.5 w-4.5" />
               </div>
-              <p className="mt-2 text-sm font-semibold leading-6 text-budget-text/60">
-                Local reminders are best-effort and may not fire if BudgetCat or the browser is closed.
-              </p>
+
+              <div className="min-w-0">
+                <p className="text-sm font-black text-[var(--bc-text)]">
+                  Sync failed for {latestSyncError.tableName}
+                </p>
+                <p className="mt-1 text-xs font-semibold leading-relaxed text-[var(--bc-text-muted)]">
+                  {latestSyncError.message}
+                </p>
+                {latestSyncError.code ? (
+                  <p className="mt-2 text-[11px] font-black text-[var(--bc-red)]">
+                    Code: {latestSyncError.code}
+                  </p>
+                ) : null}
+              </div>
             </div>
-            {notificationMessage && (
-              <p className="rounded-xl bg-budget-background px-3 py-3 text-sm font-semibold text-budget-text/65">
-                {notificationMessage}
-              </p>
-            )}
-            <label className="grid gap-2 rounded-xl bg-budget-background p-3 text-sm font-bold">
-              <span className="inline-flex items-center gap-2">
-                <Volume2 size={18} />
-                Reminder sound
+          </div>
+        )}
+
+        <div className="mt-4 grid grid-cols-2 gap-3">
+          <button
+            className="bc-button bc-button-primary w-full"
+            onClick={handleSyncNow}
+            type="button"
+          >
+            <RefreshCcw className="h-4.5 w-4.5" />
+            Sync Now
+          </button>
+
+          <button
+            className="bc-button bc-button-secondary w-full"
+            onClick={handleRetryFailedSync}
+            type="button"
+          >
+            Retry Failed
+          </button>
+        </div>
+
+        <div className="mt-3 rounded-[18px] border border-[var(--bc-border)] bg-[var(--bc-surface-soft)]/60 p-3">
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-xs font-black text-[var(--bc-text-muted)]">
+              Supabase config
+            </span>
+            <span
+              className={cn(
+                "rounded-full border px-2 py-1 text-[10px] font-black",
+                hasSupabaseConfig
+                  ? "border-[var(--bc-green)]/20 bg-[var(--bc-green-glow)] text-[var(--bc-green)]"
+                  : "border-[var(--bc-amber)]/20 bg-[var(--bc-amber-glow)] text-[var(--bc-amber)]",
+              )}
+            >
+              {hasSupabaseConfig ? "Found" : "Offline-only"}
+            </span>
+          </div>
+        </div>
+      </section>
+
+      <section className="bc-card mb-4 p-4">
+        <SectionTitle
+          icon={Bell}
+          subtitle="Local reminders work best while BudgetCat or your browser is open."
+          title="Notifications"
+          tone={notificationHealthy ? "green" : "amber"}
+        />
+
+        <div className="space-y-3">
+          <div className="rounded-[18px] border border-[var(--bc-border)] bg-[var(--bc-surface-soft)]/60 p-3">
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-sm font-black text-[var(--bc-text)]">
+                Permission
+              </span>
+              <span
+                className={cn(
+                  "rounded-full border px-2 py-1 text-[10px] font-black",
+                  notificationHealthy
+                    ? "border-[var(--bc-green)]/20 bg-[var(--bc-green-glow)] text-[var(--bc-green)]"
+                    : "border-[var(--bc-amber)]/20 bg-[var(--bc-amber-glow)] text-[var(--bc-amber)]",
+                )}
+              >
+                {notificationStatus}
+              </span>
+            </div>
+          </div>
+
+          <MessageBox
+            message={notificationMessage}
+            tone={notificationHealthy ? "success" : "warning"}
+          />
+
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              className="bc-button bc-button-primary w-full"
+              onClick={handleEnableNotifications}
+              type="button"
+            >
+              <Bell className="h-4.5 w-4.5" />
+              Enable
+            </button>
+
+            <button
+              className="bc-button bc-button-secondary w-full"
+              onClick={handleTestNotification}
+              type="button"
+            >
+              Test
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <section className="bc-card mb-4 p-4">
+        <SectionTitle
+          icon={soundEnabled ? Volume2 : VolumeX}
+          subtitle="Use meow or chime feedback for BudgetCat reminders."
+          title="Sound & Alerts"
+          tone="blue"
+        />
+
+        <div className="space-y-3">
+          <div className="grid gap-3 md:grid-cols-[1fr_auto]">
+            <label className="block space-y-2">
+              <span className="text-xs font-black text-[var(--bc-text-soft)]">
+                Sound Type
               </span>
               <select
-                className="budget-input"
+                className="bc-input"
                 onChange={(event) =>
-                  handleSoundPreferenceChange(event.target.value as ReminderSoundMode)
+                  handleSoundPreferenceChange(
+                    event.target.value as ReminderSoundMode,
+                  )
                 }
                 value={soundMode}
               >
@@ -384,332 +735,170 @@ export function Settings() {
                 <option value="off">Off</option>
               </select>
             </label>
-            <div className="grid grid-cols-2 gap-3">
-              <Button onClick={handleEnableNotifications} variant="secondary">
-                <Bell size={18} />
-                Enable Notifications
-              </Button>
-              <Button onClick={handleTestNotification} variant="secondary">
-                Test Notification
-              </Button>
-            </div>
-            <Button onClick={handleTestMeowSound} variant="secondary">
-              Test Meow Sound
-            </Button>
-          </div>
-        </Card>
 
-        <Card className="p-4">
-          <p className="text-xs font-black uppercase tracking-[0.16em] text-budget-text/55">
-            Data
-          </p>
-          <div className="mt-3 grid gap-3">
-            <div className="grid grid-cols-2 gap-3">
-              <Button onClick={() => handleExport("transactions_csv")} variant="secondary">
-                Transactions CSV
-              </Button>
-              <Button onClick={() => handleExport("due_dates_csv")} variant="secondary">
-                Due Dates CSV
-              </Button>
-              <Button onClick={() => handleExport("goals_csv")} variant="secondary">
-                Goals CSV
-              </Button>
-              <Button onClick={() => handleExport("full_backup_json")} variant="secondary">
-                Full Backup JSON
-              </Button>
-            </div>
-            <Button onClick={() => handleExport("goal_contributions_csv")} variant="ghost">
-              Goal Contributions CSV
-            </Button>
-            {exportMessage && (
-              <p className="text-sm font-semibold text-budget-text/65">{exportMessage}</p>
-            )}
-            <div className="rounded-xl bg-budget-background p-3 text-sm font-semibold text-budget-text/60">
-              <p className="font-black text-budget-text">PWA Install</p>
-              <p className="mt-1 leading-6">
-                BudgetCat is installable from supported browser menus. Use the install option to keep a private app shortcut on your device.
-              </p>
-              {pwaMessage && <p className="mt-2 text-budget-text/65">{pwaMessage}</p>}
-              <Button className="mt-3 w-full" disabled={!canInstallPwa} onClick={handleInstallPwa} variant="secondary">
-                Install BudgetCat
-              </Button>
+            <div className="flex gap-2 md:items-end">
+              <button
+                className="bc-button bc-button-secondary flex-1 md:flex-none"
+                onClick={handleTestSound}
+                type="button"
+              >
+                Test Sound
+              </button>
+
+              <button
+                className="bc-button bc-button-primary flex-1 md:flex-none"
+                onClick={handleTestMeowSound}
+                type="button"
+              >
+                Meow
+              </button>
             </div>
           </div>
-        </Card>
 
-        <Card className="p-4">
-          <p className="text-xs font-black uppercase tracking-[0.16em] text-budget-text/55">
-            Danger Zone
+          <ToggleRow
+            checked={soundEnabled}
+            description="Turning this off sets reminder sound to Off."
+            onChange={(checked) =>
+              handleSoundPreferenceChange(checked ? "meow" : "off")
+            }
+            title="Enable sounds"
+          />
+        </div>
+      </section>
+
+      <section className="bc-card mb-4 p-4">
+        <SectionTitle
+          icon={Download}
+          subtitle="Export real local BudgetCat data from this device."
+          title="Export Data"
+          tone="blue"
+        />
+
+        <div className="space-y-3">
+          <ExportButton
+            description="Transactions in CSV format"
+            label="Transactions CSV"
+            onClick={() => handleExport("transactions_csv")}
+          />
+
+          <ExportButton
+            description="Bills and due dates in CSV format"
+            label="Due Dates CSV"
+            onClick={() => handleExport("due_dates_csv")}
+          />
+
+          <ExportButton
+            description="Savings goals in CSV format"
+            label="Goals CSV"
+            onClick={() => handleExport("goals_csv")}
+          />
+
+          <ExportButton
+            description="Goal contributions in CSV format"
+            label="Goal Contributions CSV"
+            onClick={() => handleExport("goal_contributions_csv")}
+          />
+
+          <ExportButton
+            description="Complete local JSON backup"
+            label="Full Backup JSON"
+            onClick={() => handleExport("full_backup_json")}
+          />
+
+          <MessageBox message={exportMessage} tone="info" />
+        </div>
+      </section>
+
+      <section className="bc-card mb-4 p-4">
+        <SectionTitle
+          icon={Smartphone}
+          subtitle="Install BudgetCat as a private app shortcut when supported."
+          title="PWA Install"
+          tone="green"
+        />
+
+        <div className="rounded-[18px] border border-[var(--bc-border)] bg-[var(--bc-surface-soft)]/60 p-3">
+          <p className="text-xs font-semibold leading-relaxed text-[var(--bc-text-muted)]">
+            Chrome/Edge desktop: install icon in the address bar. Android
+            Chrome: browser menu then Add to Home screen. iPhone Safari: Share
+            then Add to Home Screen.
           </p>
-          <Button className="mt-3 w-full" onClick={handleClearLocalTestData} variant="urgent">
-            <Trash2 size={18} />
+        </div>
+
+        <MessageBox message={pwaMessage} tone="info" />
+
+        <button
+          className="bc-button bc-button-primary mt-4 w-full"
+          disabled={!canInstallPwa}
+          onClick={handleInstallPwa}
+          type="button"
+        >
+          <Smartphone className="h-4.5 w-4.5" />
+          {canInstallPwa ? "Install BudgetCat" : "Install Prompt Unavailable"}
+        </button>
+      </section>
+
+      <section className="bc-card mb-4 border-[var(--bc-red)]/20 p-4">
+        <SectionTitle
+          icon={Trash2}
+          subtitle="Use this only for local test cleanup."
+          title="Danger Zone"
+          tone="red"
+        />
+
+        <div className="rounded-[18px] border border-[var(--bc-red)]/20 bg-[var(--bc-red-glow)] p-3">
+          <p className="text-sm font-black text-[var(--bc-text)]">
             Clear local test data
-          </Button>
-          <p className="mt-2 text-xs font-semibold text-budget-text/55">
+          </p>
+          <p className="mt-1 text-xs font-semibold leading-relaxed text-[var(--bc-text-muted)]">
             This clears local test records only. Supabase data is not changed.
           </p>
-        </Card>
-      </div>
+        </div>
 
-      <div className="hidden md:block">
-      <PageHeader
-        action={
-          <div className="flex flex-wrap items-center gap-3">
-            <Button onClick={handleSyncNow} variant="secondary">
-              <RefreshCcw size={18} />
-              Sync Now
-            </Button>
-            <Button onClick={handleRetryFailedSync} variant="secondary">
-              Retry Failed Sync
-            </Button>
-            <Button onClick={signOut} variant="secondary">
-              <LogOut size={18} />
-              Logout
-            </Button>
-          </div>
-        }
-        subtitle="Personal app preferences and sync controls."
-        title="Settings"
-      />
-      <section className="grid gap-4">
-        <Card className="p-5">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-            <div className="min-w-0 flex-1">
-              <h2 className="text-lg font-black">Nickname</h2>
-              <p className="mt-1 text-sm font-semibold text-budget-text/60">
-                This is what Bonnie and Clyde will call you.
-              </p>
-              <input
-                className="budget-input mt-4 max-w-md"
-                onChange={(event) => setNickname(event.target.value)}
-                placeholder="Robert"
-                value={nickname}
-              />
-              {nicknameMessage && (
-                <p className="mt-2 text-sm font-semibold text-budget-text/65">
-                  {nicknameMessage}
-                </p>
-              )}
-            </div>
-            <Button onClick={handleSaveNickname}>Save Nickname</Button>
-          </div>
-        </Card>
-        <Card className="p-5">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h2 className="text-lg font-black">Sync Status</h2>
-              <p className="mt-1 text-sm font-semibold text-budget-text/55">
-                {pendingCount} pending local record{pendingCount === 1 ? "" : "s"}.
-              </p>
-              {syncStatus.isSyncing && (
-                <div className="mt-3 max-w-md">
-                  <div className="mb-2 flex items-center justify-between gap-3 text-xs font-black text-budget-text/55">
-                    <span>{syncStatus.currentTable ?? "Syncing"}</span>
-                    <span>{syncStatus.percentComplete}%</span>
-                  </div>
-                  <div className="h-2 overflow-hidden rounded-full bg-budget-background ring-1 ring-budget-border">
-                    <div
-                      className="h-full rounded-full bg-budget-primary transition-all duration-500 ease-out"
-                      style={{ width: `${syncStatus.percentComplete}%` }}
-                    />
-                  </div>
-                </div>
-              )}
-              {syncMessage && (
-                <p className="mt-2 text-sm font-semibold text-budget-text/65">
-                  {syncMessage}
-                </p>
-              )}
-              {latestSyncError && (
-                <div className="mt-3 rounded-lg border border-budget-urgent/30 bg-budget-urgent/10 px-4 py-3 text-sm">
-                  <p className="font-black text-budget-urgent">
-                    Sync failed for {latestSyncError.tableName}
-                  </p>
-                  <p className="mt-1 font-semibold text-budget-text/70">
-                    {latestSyncError.message}
-                  </p>
-                  {latestSyncError.code && (
-                    <p className="mt-1 text-xs font-semibold text-budget-text/50">
-                      Code: {latestSyncError.code}
-                    </p>
-                  )}
-                </div>
-              )}
-            </div>
-            <SyncStatusIndicator showProgress />
-          </div>
-        </Card>
-        <Card className="p-5">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-            <div>
-              <div className="flex items-center gap-3">
-                <div className="grid h-12 w-12 shrink-0 place-items-center rounded-lg bg-budget-primary/12 text-budget-primary">
-                  <Bell size={21} />
-                </div>
-                <div>
-                  <h2 className="text-lg font-black">Notification Permission</h2>
-                  <p className="mt-1 text-sm font-semibold text-budget-text/55">
-                    Status: {notificationStatus}
-                  </p>
-                </div>
-              </div>
-              <p className="mt-4 max-w-2xl text-sm font-semibold leading-6 text-budget-text/60">
-                Local reminders are best-effort and may not fire if BudgetCat or the browser is closed.
-              </p>
-              {notificationMessage && (
-                <p className="mt-2 rounded-lg bg-budget-background px-4 py-3 text-sm font-semibold text-budget-text/65">
-                  {notificationMessage}
-                </p>
-              )}
-              <label className="mt-4 grid max-w-sm gap-2 rounded-lg bg-budget-background p-4 text-sm font-bold">
-                <span className="inline-flex items-center gap-2">
-                  <Volume2 size={18} />
-                  Reminder sound
-                </span>
-                <select
-                  className="budget-input"
-                  onChange={(event) =>
-                    handleSoundPreferenceChange(event.target.value as ReminderSoundMode)
-                  }
-                  value={soundMode}
-                >
-                  <option value="meow">Meow</option>
-                  <option value="chime">Soft Chime</option>
-                  <option value="off">Off</option>
-                </select>
-              </label>
-            </div>
-            <div className="flex flex-col gap-3 sm:flex-row">
-              <Button onClick={handleEnableNotifications} variant="secondary">
-                <Bell size={18} />
-                Enable Notifications
-              </Button>
-              <Button onClick={handleTestNotification} variant="secondary">
-                Test Notification
-              </Button>
-              <Button onClick={handleTestMeowSound} variant="secondary">
-                Test Meow Sound
-              </Button>
-            </div>
-          </div>
-        </Card>
-        <Card className="p-5">
-          <div className="flex items-center gap-3">
-            <div className="grid h-12 w-12 shrink-0 place-items-center rounded-lg bg-budget-primary/12 text-budget-primary">
-              <FileDown size={21} />
-            </div>
-            <div>
-              <h2 className="text-lg font-black">Export Backup</h2>
-              <p className="mt-1 text-sm font-semibold text-budget-text/55">
-                Export local Dexie data from this device.
-              </p>
-            </div>
-          </div>
-          <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <Button onClick={() => handleExport("transactions_csv")} variant="secondary">
-              Export Transactions CSV
-            </Button>
-            <Button onClick={() => handleExport("due_dates_csv")} variant="secondary">
-              Export Due Dates CSV
-            </Button>
-            <Button onClick={() => handleExport("goals_csv")} variant="secondary">
-              Export Goals CSV
-            </Button>
-            <Button onClick={() => handleExport("full_backup_json")} variant="secondary">
-              Export Full Backup JSON
-            </Button>
-          </div>
-          <div className="mt-3">
-            <Button onClick={() => handleExport("goal_contributions_csv")} variant="ghost">
-              Export Goal Contributions CSV
-            </Button>
-          </div>
-          {exportMessage && (
-            <p className="mt-3 text-sm font-semibold text-budget-text/65">
-              {exportMessage}
-            </p>
-          )}
-        </Card>
-        <Card className="p-5">
-          <div className="flex items-start gap-4">
-            <div className="grid h-12 w-12 shrink-0 place-items-center rounded-lg bg-budget-primary/12 text-budget-primary">
-              <Smartphone size={21} />
-            </div>
-            <div className="min-w-0 flex-1">
-              <h2 className="text-lg font-black">PWA Install</h2>
-              <p className="mt-1 text-sm font-semibold leading-6 text-budget-text/60">
-                BudgetCat is installable from supported browser menus. Use the install option to keep a private app shortcut on your device.
-              </p>
-              <p className="mt-2 text-sm font-semibold text-budget-text/55">
-                Chrome/Edge desktop: install icon in the address bar. Android Chrome: browser menu then Add to Home screen. iPhone Safari: Share then Add to Home Screen.
-              </p>
-              <p className="mt-2 text-sm font-semibold text-budget-text/55">
-                Offline mode: local entries keep saving to this device when network access is unavailable.
-              </p>
-              {pwaMessage && (
-                <p className="mt-2 text-sm font-semibold text-budget-text/65">
-                  {pwaMessage}
-                </p>
-              )}
-            </div>
-            <div className="hidden shrink-0 sm:block">
-              <Button disabled={!canInstallPwa} onClick={handleInstallPwa} variant="secondary">
-                Install BudgetCat
-              </Button>
-            </div>
-          </div>
-          <div className="mt-4 sm:hidden">
-            <Button className="w-full" disabled={!canInstallPwa} onClick={handleInstallPwa} variant="secondary">
-              Install BudgetCat
-            </Button>
-          </div>
-        </Card>
-        {sections.map((section) => (
-          <Card className="p-5" key={section.title}>
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex gap-4">
-                <div className="grid h-12 w-12 shrink-0 place-items-center rounded-lg bg-budget-primary/12 text-budget-primary">
-                  <section.icon size={21} />
-                </div>
-                <div>
-                  <h2 className="text-lg font-black">{section.title}</h2>
-                  <p className="mt-1 text-sm font-semibold text-budget-text/55">
-                    {section.description}
-                  </p>
-                </div>
-              </div>
-              <Badge tone="cat">{section.meta}</Badge>
-            </div>
-          </Card>
-        ))}
-        <Card className="p-5">
-          <h2 className="text-lg font-black">App Preferences</h2>
-          <div className="mt-4 grid gap-3 md:grid-cols-2">
-            <div className="flex items-center justify-between gap-4 rounded-lg bg-budget-background p-4 text-sm font-bold">
-              Theme
-              <ThemeToggle />
-            </div>
-            <label className="flex items-center justify-between gap-4 rounded-lg bg-budget-background p-4 text-sm font-bold">
-              Warm dashboard density
-              <input defaultChecked type="checkbox" />
-            </label>
-            <label className="flex items-center justify-between gap-4 rounded-lg bg-budget-background p-4 text-sm font-bold">
-              Show mascot reminders
-              <input defaultChecked type="checkbox" />
-            </label>
-          </div>
-          <p className="mt-4 text-sm font-semibold text-budget-text/55">
-            Supabase config: {hasSupabaseConfig ? "environment variables found" : "offline-only mode"}
-          </p>
-          <div className="mt-5">
-            <Button onClick={handleClearLocalTestData} variant="urgent">
-              <Trash2 size={18} />
-              Clear local test data
-            </Button>
-          </div>
-        </Card>
+        <button
+          className="bc-button bc-button-danger mt-4 w-full"
+          onClick={handleClearLocalTestData}
+          type="button"
+        >
+          <Trash2 className="h-4.5 w-4.5" />
+          Clear Local Test Data
+        </button>
+
+        <button
+          className="mt-3 flex w-full items-center justify-center gap-2 rounded-2xl py-3 text-sm font-black text-[var(--bc-red)]"
+          onClick={signOut}
+          type="button"
+        >
+          <LogOut className="h-4.5 w-4.5" />
+          Log Out
+        </button>
       </section>
-      </div>
-    </>
+
+      <section className="bc-card p-4">
+        <div className="flex items-start gap-3">
+          <div className="bc-icon-circle-green">
+            <ShieldCheck className="h-4.5 w-4.5" />
+          </div>
+
+          <div>
+            <p className="text-sm font-black text-[var(--bc-text)]">
+              Private personal budget tracker
+            </p>
+            <p className="mt-1 text-xs font-semibold leading-relaxed text-[var(--bc-text-muted)]">
+              BudgetCat uses manual entries, local-first storage, and sync when
+              available. No bank connection. No sample finance data.
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-4 flex items-center gap-2 text-[11px] font-black text-[var(--bc-text-muted)]">
+          <Sun className="h-3.5 w-3.5" />
+          Light mode
+          <span>•</span>
+          <Moon className="h-3.5 w-3.5" />
+          Dark mode
+        </div>
+      </section>
+    </div>
   );
 }

@@ -1,22 +1,104 @@
-import { LockKeyhole, Mail, UserPlus } from "lucide-react";
+import {
+  ArrowRight,
+  CheckCircle2,
+  LockKeyhole,
+  Mail,
+  ShieldCheck,
+  Sparkles,
+  UserPlus,
+  WalletCards,
+  WifiOff,
+} from "lucide-react";
 import { type FormEvent, useState } from "react";
-import { useAuth } from "../contexts/AuthContext";
+
 import { ThemeToggle } from "../components/layout/ThemeToggle";
 import { BudgetCatMascot } from "../components/mascot/BudgetCatMascot";
-import { Button } from "../components/ui/Button";
-import { Card } from "../components/ui/Card";
+import { useAuth } from "../contexts/AuthContext";
+import { cn } from "../lib/utils";
+
+type AuthMode = "login" | "signup";
+
+function AuthModeButton({
+  active,
+  children,
+  onClick,
+}: {
+  active: boolean;
+  children: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      className={cn(
+        "min-h-10 flex-1 rounded-2xl text-sm font-black transition",
+        active
+          ? "bg-[var(--bc-green-glow)] text-[var(--bc-green)] shadow-sm"
+          : "text-[var(--bc-text-muted)] hover:bg-[var(--bc-surface-soft)] hover:text-[var(--bc-text)]",
+      )}
+      onClick={onClick}
+      type="button"
+    >
+      {children}
+    </button>
+  );
+}
+
+function TrustItem({
+  icon: Icon,
+  title,
+  description,
+  tone = "green",
+}: {
+  icon: typeof ShieldCheck;
+  title: string;
+  description: string;
+  tone?: "green" | "amber" | "blue";
+}) {
+  const toneClass = {
+    green: "bc-icon-circle-green",
+    amber: "bc-icon-circle-amber",
+    blue: "bc-icon-circle-blue",
+  }[tone];
+
+  return (
+    <div className="flex items-start gap-3 rounded-[20px] border border-[var(--bc-border)] bg-[var(--bc-card)]/70 p-3">
+      <div className={cn("bc-icon-circle h-10 w-10 shrink-0", toneClass)}>
+        <Icon className="h-4.5 w-4.5" strokeWidth={2.4} />
+      </div>
+
+      <div className="min-w-0">
+        <p className="text-sm font-black text-[var(--bc-text)]">{title}</p>
+        <p className="mt-1 text-xs font-semibold leading-relaxed text-[var(--bc-text-muted)]">
+          {description}
+        </p>
+      </div>
+    </div>
+  );
+}
 
 export function Login() {
-  const { authError, authMessage, isSupabaseConfigured, signIn, signUp } = useAuth();
-  const [mode, setMode] = useState<"login" | "signup">("login");
+  const {
+    authError,
+    authMessage,
+    isSupabaseConfigured,
+    signIn,
+    signUp,
+  } = useAuth();
+
+  const [mode, setMode] = useState<AuthMode>("login");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [localMessage, setLocalMessage] = useState<string | null>(null);
+
   const authNotice = authError ?? authMessage ?? localMessage;
-  const isSignupSuccess =
-    Boolean(authMessage && !authError && authMessage.toLowerCase().startsWith("account created"));
+  const isSignupSuccess = Boolean(
+    authMessage &&
+      !authError &&
+      authMessage.toLowerCase().startsWith("account created"),
+  );
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+
     const formData = new FormData(event.currentTarget);
     const email = String(formData.get("email") || "");
     const password = String(formData.get("password") || "");
@@ -39,244 +121,288 @@ export function Login() {
   }
 
   return (
-    <main className="min-h-screen bg-budget-background text-budget-text md:grid md:place-items-center md:px-4 md:py-10">
-      <div className="sticky top-0 z-20 border-b border-budget-border bg-budget-background/95 px-4 py-3 md:hidden">
-        <div className="mx-auto flex max-w-md items-center justify-between gap-3">
-          <div className="flex min-w-0 items-center gap-3">
-            <img
-              alt="BudgetCat"
-              className="h-10 w-10 object-contain"
-              src="/assets/icons/budgetcat-icon.png"
-            />
-            <div className="min-w-0">
-              <h1 className="truncate text-lg font-black text-budget-primary">BudgetCat</h1>
-              <p className="truncate text-xs font-semibold text-budget-text/55">
-                BudgetCat Version 2
-              </p>
-            </div>
-          </div>
-          <ThemeToggle className="h-9 w-9" />
-        </div>
-      </div>
-      <ThemeToggle className="fixed right-4 top-4 z-20 hidden md:grid" />
+    <main className="bc-app-shell min-h-screen overflow-hidden">
+      <div className="mx-auto grid min-h-screen w-full max-w-[1180px] gap-6 px-5 py-5 md:grid-cols-[0.95fr_1.05fr] md:items-center md:px-8 md:py-8">
+        <section className="relative order-2 flex min-h-[calc(100vh-2.5rem)] flex-col justify-between rounded-[34px] border border-[var(--bc-border)] bg-[var(--bc-card)]/70 p-5 shadow-2xl shadow-black/10 md:order-1 md:min-h-[calc(100vh-4rem)] md:p-7">
+          <div className="absolute inset-x-8 top-0 h-24 rounded-full bg-[var(--bc-green-glow)] blur-3xl" />
 
-      <div className="mx-auto w-full max-w-md px-4 py-4 md:hidden">
-        <div className="flex items-end justify-center overflow-visible">
-          <BudgetCatMascot
-            imageClassName="w-[min(78vw,260px)] max-w-[260px] object-contain object-bottom"
-            variant="both"
-          />
-        </div>
-
-        <Card className="mt-3 p-4">
-          <div className="grid grid-cols-2 rounded-xl border border-budget-border bg-budget-background p-1">
-            <button
-              className={
-                mode === "login"
-                  ? "rounded-lg bg-budget-primary px-3 py-2 text-sm font-black text-white"
-                  : "rounded-lg px-3 py-2 text-sm font-black text-budget-text/60"
-              }
-              onClick={() => setMode("login")}
-              type="button"
-            >
-              Login
-            </button>
-            <button
-              className={
-                mode === "signup"
-                  ? "rounded-lg bg-budget-primary px-3 py-2 text-sm font-black text-white"
-                  : "rounded-lg px-3 py-2 text-sm font-black text-budget-text/60"
-              }
-              onClick={() => setMode("signup")}
-              type="button"
-            >
-              Sign Up
-            </button>
-          </div>
-
-          <div className="mt-5">
-            <h2 className="text-2xl font-black leading-tight text-budget-text">
-              {mode === "signup" ? "Create your account." : "Welcome back to your money corner."}
-            </h2>
-            <p className="mt-2 text-sm font-semibold leading-6 text-budget-text/65">
-              {isSupabaseConfigured
-                ? mode === "signup"
-                  ? "Create an account to sync your private BudgetCat data."
-                  : "Use your email and password to log in."
-                : "Supabase is not configured, so BudgetCat will run in offline-only mode."}
-            </p>
-            {mode === "login" && (
-              <div className="mt-3 space-y-1 text-sm font-semibold leading-6 text-budget-text/65">
-                <p>Bonnie & Clyde say: Your coins are safe here.</p>
-                <p>Made by Robert Tapangan as a personal-use project.</p>
+          <div className="relative z-10 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-[var(--bc-border)] bg-[var(--bc-green-glow)]">
+                <BudgetCatMascot
+                  className="h-10 w-10"
+                  imageClassName="h-full w-full object-contain"
+                  variant="icon"
+                />
               </div>
-            )}
+
+              <div>
+                <p className="text-lg font-black tracking-[-0.04em] text-[var(--bc-text)]">
+                  BudgetCat
+                </p>
+                <p className="text-xs font-bold text-[var(--bc-text-muted)]">
+                  Private budget tracker
+                </p>
+              </div>
+            </div>
+
+            <ThemeToggle className="h-11 w-11 rounded-2xl border border-[var(--bc-border)] bg-[var(--bc-surface-soft)] text-[var(--bc-text)]" />
           </div>
 
-          {authNotice && (
-            <div
-              className={
-                isSignupSuccess
-                  ? "mt-4 rounded-xl border border-budget-success/30 bg-budget-green-faint px-4 py-3 text-sm font-semibold text-budget-text"
-                  : "mt-4 rounded-xl border border-budget-urgent/25 bg-budget-urgent/10 px-4 py-3 text-sm font-semibold text-budget-urgent"
-              }
-            >
-              <p className="font-black">
-                {isSignupSuccess ? "Sign up success" : "Auth message"}
-              </p>
-              <p className="mt-1">{authNotice}</p>
+          <div className="relative z-10 my-8 flex flex-1 flex-col justify-center">
+            <div className="mx-auto flex w-full max-w-sm justify-center">
+              <BudgetCatMascot
+                className="h-44 w-64 md:h-56 md:w-80"
+                imageClassName="h-full w-full object-contain drop-shadow-2xl"
+                variant="both"
+              />
             </div>
-          )}
 
-          <form className="mt-5 grid gap-4" onSubmit={handleSubmit}>
-            <label className="grid gap-2 text-sm font-bold">
-              Email
-              <span className="relative">
-                <Mail
-                  className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-budget-text/40"
-                  size={18}
-                />
-                <input
-                  className="budget-input pl-11"
-                  name="email"
-                  placeholder="you@example.com"
-                  required
-                  type="email"
-                />
-              </span>
-            </label>
-            <label className="grid gap-2 text-sm font-bold">
-              Password
-              <span className="relative">
-                <LockKeyhole
-                  className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-budget-text/40"
-                  size={18}
-                />
-                <input
-                  className="budget-input pl-11"
-                  minLength={6}
-                  name="password"
-                  placeholder="Password"
-                  required
-                  type="password"
-                />
-              </span>
-            </label>
-            <Button className="mt-2 w-full" disabled={isSubmitting} type="submit">
-              {mode === "signup" ? <UserPlus size={18} /> : <LockKeyhole size={18} />}
-              {isSubmitting ? "Working..." : mode === "signup" ? "Create Account" : "Login"}
-            </Button>
-          </form>
-        </Card>
-      </div>
+            <div className="mt-5 text-center">
+              <div className="mx-auto inline-flex items-center gap-2 rounded-full border border-[var(--bc-border)] bg-[var(--bc-surface-soft)] px-3 py-1 text-[11px] font-black text-[var(--bc-green)]">
+                <Sparkles className="h-3.5 w-3.5" />
+                Smart. Friendly. Focused.
+              </div>
 
-      <div className="hidden md:block">
-        <div className="w-full max-w-5xl overflow-hidden rounded-xl border border-budget-border bg-budget-card">
-          <div className="grid md:grid-cols-[1.05fr_0.95fr]">
-            <section className="p-7 sm:p-10">
+              <h1 className="mt-4 text-4xl font-black leading-[0.95] tracking-[-0.07em] text-[var(--bc-text)] md:text-6xl">
+                Your money,
+                <br />
+                calmly tracked.
+              </h1>
+
+              <p className="mx-auto mt-4 max-w-sm text-sm font-semibold leading-relaxed text-[var(--bc-text-muted)]">
+                Manual income, expenses, bills, savings, and goals — with
+                Bonnie and Clyde helping you stay aware without stress.
+              </p>
+            </div>
+
+            <div className="mt-6 grid gap-3">
+              <TrustItem
+                description="No bank connection. You control every entry."
+                icon={ShieldCheck}
+                title="Manual and private"
+              />
+
+              <TrustItem
+                description="BudgetCat keeps local-first records and syncs when available."
+                icon={WalletCards}
+                title="Offline-first budget space"
+                tone="blue"
+              />
+
+              <TrustItem
+                description={
+                  isSupabaseConfigured
+                    ? "Supabase sync is configured for this app."
+                    : "Supabase is not configured, so BudgetCat runs offline-only."
+                }
+                icon={isSupabaseConfigured ? CheckCircle2 : WifiOff}
+                title={isSupabaseConfigured ? "Sync ready" : "Offline-only mode"}
+                tone={isSupabaseConfigured ? "green" : "amber"}
+              />
+            </div>
+          </div>
+
+          <p className="relative z-10 text-center text-[11px] font-bold text-[var(--bc-text-muted)]">
+            Made by Robert Tapangan as a personal-use project.
+          </p>
+        </section>
+
+        <section className="order-1 flex min-h-screen items-center md:order-2 md:min-h-0">
+          <div className="mx-auto w-full max-w-[430px]">
+            <div className="mb-6 flex items-center justify-between gap-3 md:hidden">
               <div className="flex items-center gap-3">
-                <img
-                  alt="BudgetCat"
-                  className="h-12 w-12 object-contain"
-                  src="/assets/icons/budgetcat-icon.png"
-                />
+                <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-[var(--bc-border)] bg-[var(--bc-green-glow)]">
+                  <BudgetCatMascot
+                    className="h-9 w-9"
+                    imageClassName="h-full w-full object-contain"
+                    variant="icon"
+                  />
+                </div>
+
                 <div>
-                  <h1 className="text-2xl font-black text-budget-primary">BudgetCat</h1>
-                  <p className="text-sm font-semibold text-budget-text/55">
-                    BudgetCat Version 2
+                  <p className="text-lg font-black tracking-[-0.04em] text-[var(--bc-text)]">
+                    BudgetCat
+                  </p>
+                  <p className="text-xs font-bold text-[var(--bc-text-muted)]">
+                    Personal budget app
                   </p>
                 </div>
               </div>
-              <div className="mt-10">
-                <h2 className="text-3xl font-black leading-tight sm:text-4xl">
-                  Welcome back to your money corner.
-                </h2>
-                <p className="mt-4 max-w-md text-sm leading-6 text-budget-text/65">
-                  {isSupabaseConfigured
-                    ? "Use your email and password to log in."
-                    : "Supabase is not configured, so BudgetCat will run in offline-only mode."}
-                </p>
-              </div>
-              <div className="mt-7 grid grid-cols-2 rounded-lg border border-budget-border bg-budget-background p-1">
-                <button
-                  className={
-                    mode === "login"
-                      ? "rounded-md bg-budget-card px-4 py-2 text-sm font-black"
-                      : "rounded-md px-4 py-2 text-sm font-black text-budget-text/60"
-                  }
-                  onClick={() => setMode("login")}
-                  type="button"
-                >
-                  Login
-                </button>
-                <button
-                  className={
-                    mode === "signup"
-                      ? "rounded-md bg-budget-card px-4 py-2 text-sm font-black"
-                      : "rounded-md px-4 py-2 text-sm font-black text-budget-text/60"
-                  }
-                  onClick={() => setMode("signup")}
-                  type="button"
-                >
-                  Sign Up
-                </button>
-              </div>
-              <form className="mt-6 grid gap-4" onSubmit={handleSubmit}>
-                <label className="grid gap-2 text-sm font-bold">
-                  Email
-                  <input
-                    className="budget-input"
-                    name="email"
-                    placeholder="you@example.com"
-                    required
-                    type="email"
-                  />
-                </label>
-                <label className="grid gap-2 text-sm font-bold">
-                  Password
-                  <input
-                    className="budget-input"
-                    minLength={6}
-                    name="password"
-                    placeholder="Password"
-                    required
-                    type="password"
-                  />
-                </label>
-                {authNotice && (
-                  <p
-                    className={
-                      isSignupSuccess
-                        ? "rounded-lg border border-budget-success/30 bg-budget-green-faint px-4 py-3 text-sm font-bold text-budget-text"
-                        : "rounded-lg bg-budget-urgent/10 px-4 py-3 text-sm font-bold text-budget-urgent"
-                    }
-                  >
-                    {authNotice}
-                  </p>
-                )}
-                <Button className="mt-2 w-full" disabled={isSubmitting} type="submit">
-                  {mode === "signup" ? <UserPlus size={18} /> : <LockKeyhole size={18} />}
-                  {isSubmitting ? "Working..." : mode === "signup" ? "Create Account" : "Login"}
-                </Button>
-              </form>
-            </section>
 
-            <section className="bg-budget-background p-7 sm:p-10">
-              <div className="flex h-full min-h-[460px] flex-col">
-                <h2 className="text-center text-2xl font-black leading-tight sm:text-3xl">
-                  <span className="text-budget-cat">Bonnie & Clyde</span> Are Ready to Track Your{" "}
-                  <span className="text-budget-primary">Money</span> Trail
-                </h2>
-                <div className="mt-8 flex min-h-[300px] flex-1 items-end justify-center overflow-visible sm:min-h-[360px]">
+              <ThemeToggle className="h-11 w-11 rounded-2xl border border-[var(--bc-border)] bg-[var(--bc-card)] text-[var(--bc-text)]" />
+            </div>
+
+            <article className="bc-card-elevated overflow-hidden p-5 md:p-6">
+              <div className="mb-5 text-center">
+                <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-[24px] border border-[var(--bc-border)] bg-[var(--bc-green-glow)] md:hidden">
                   <BudgetCatMascot
-                    imageClassName="w-[min(90vw,420px)] max-w-[500px] object-contain object-bottom md:w-full"
+                    className="h-14 w-14"
+                    imageClassName="h-full w-full object-contain"
                     variant="both"
                   />
                 </div>
+
+                <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[var(--bc-text-muted)]">
+                  {mode === "signup" ? "Create account" : "Welcome back"}
+                </p>
+
+                <h2 className="mt-2 text-3xl font-black tracking-[-0.06em] text-[var(--bc-text)]">
+                  {mode === "signup"
+                    ? "Start your BudgetCat space"
+                    : "Log in to BudgetCat"}
+                </h2>
+
+                <p className="mt-2 text-sm font-semibold leading-relaxed text-[var(--bc-text-muted)]">
+                  {isSupabaseConfigured
+                    ? mode === "signup"
+                      ? "Create an account to sync your private BudgetCat data."
+                      : "Use your email and password to continue."
+                    : "Supabase is not configured, so BudgetCat will run in offline-only mode."}
+                </p>
               </div>
-            </section>
+
+              <div className="bc-segment mb-5">
+                <AuthModeButton
+                  active={mode === "login"}
+                  onClick={() => {
+                    setMode("login");
+                    setLocalMessage(null);
+                  }}
+                >
+                  Login
+                </AuthModeButton>
+
+                <AuthModeButton
+                  active={mode === "signup"}
+                  onClick={() => {
+                    setMode("signup");
+                    setLocalMessage(null);
+                  }}
+                >
+                  Sign Up
+                </AuthModeButton>
+              </div>
+
+              {authNotice && (
+                <div
+                  className={cn(
+                    "mb-5 rounded-[22px] border p-4",
+                    isSignupSuccess
+                      ? "border-[var(--bc-green)]/20 bg-[var(--bc-green-glow)]"
+                      : "border-[var(--bc-amber)]/20 bg-[var(--bc-amber-glow)]",
+                  )}
+                >
+                  <div className="flex items-start gap-3">
+                    <div
+                      className={cn(
+                        "flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[var(--bc-border)] bg-[var(--bc-card)]",
+                        isSignupSuccess
+                          ? "text-[var(--bc-green)]"
+                          : "text-[var(--bc-amber)]",
+                      )}
+                    >
+                      {isSignupSuccess ? (
+                        <CheckCircle2 className="h-4.5 w-4.5" />
+                      ) : (
+                        <ShieldCheck className="h-4.5 w-4.5" />
+                      )}
+                    </div>
+
+                    <div>
+                      <p className="text-sm font-black text-[var(--bc-text)]">
+                        {isSignupSuccess ? "Sign up success" : "Auth message"}
+                      </p>
+                      <p className="mt-1 text-xs font-semibold leading-relaxed text-[var(--bc-text-muted)]">
+                        {authNotice}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <form className="space-y-4" onSubmit={handleSubmit}>
+                <label className="block space-y-2">
+                  <span className="text-xs font-black text-[var(--bc-text-soft)]">
+                    Email
+                  </span>
+
+                  <div className="relative">
+                    <Mail className="pointer-events-none absolute left-4 top-1/2 h-4.5 w-4.5 -translate-y-1/2 text-[var(--bc-text-muted)]" />
+                    <input
+                      autoComplete="email"
+                      className="bc-input min-h-[54px] pl-12"
+                      name="email"
+                      placeholder="you@example.com"
+                      required
+                      type="email"
+                    />
+                  </div>
+                </label>
+
+                <label className="block space-y-2">
+                  <span className="text-xs font-black text-[var(--bc-text-soft)]">
+                    Password
+                  </span>
+
+                  <div className="relative">
+                    <LockKeyhole className="pointer-events-none absolute left-4 top-1/2 h-4.5 w-4.5 -translate-y-1/2 text-[var(--bc-text-muted)]" />
+                    <input
+                      autoComplete={
+                        mode === "signup" ? "new-password" : "current-password"
+                      }
+                      className="bc-input min-h-[54px] pl-12"
+                      minLength={6}
+                      name="password"
+                      placeholder="••••••••"
+                      required
+                      type="password"
+                    />
+                  </div>
+                </label>
+
+                <button
+                  className="bc-button bc-button-primary mt-2 w-full"
+                  disabled={isSubmitting}
+                  type="submit"
+                >
+                  {mode === "signup" ? (
+                    <UserPlus className="h-4.5 w-4.5" />
+                  ) : (
+                    <ArrowRight className="h-4.5 w-4.5" />
+                  )}
+                  {isSubmitting
+                    ? "Working..."
+                    : mode === "signup"
+                      ? "Create Account"
+                      : "Login"}
+                </button>
+              </form>
+
+              <div className="mt-5 rounded-[22px] border border-[var(--bc-border)] bg-[var(--bc-surface-soft)]/60 p-4">
+                <div className="flex items-start gap-3">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[var(--bc-border)] bg-[var(--bc-card)] text-lg">
+                    🐾
+                  </div>
+
+                  <div>
+                    <p className="text-sm font-black text-[var(--bc-text)]">
+                      Bonnie & Clyde say:
+                    </p>
+                    <p className="mt-1 text-xs font-semibold leading-relaxed text-[var(--bc-text-muted)]">
+                      Your coins are safe here. Track manually, review calmly,
+                      and keep your budget simple.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </article>
+
+            <p className="mt-5 text-center text-[11px] font-bold text-[var(--bc-text-muted)] md:hidden">
+              No bank connection • Manual entries only • Private personal app
+            </p>
           </div>
-        </div>
+        </section>
       </div>
     </main>
   );

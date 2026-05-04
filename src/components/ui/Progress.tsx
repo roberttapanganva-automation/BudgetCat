@@ -10,12 +10,12 @@ export function Progress({
   return (
     <div
       className={cn(
-        "h-3 overflow-hidden rounded-full bg-budget-background ring-1 ring-budget-border",
+        "h-3 overflow-hidden rounded-full bg-[var(--bc-bg-deep)] border border-[var(--bc-border)]",
         className,
       )}
     >
       <div
-        className="h-full rounded-full bg-budget-success transition-all"
+        className="h-full rounded-full bg-[var(--bc-green)] transition-all"
         style={{ width: `${Math.max(0, Math.min(100, value))}%` }}
       />
     </div>

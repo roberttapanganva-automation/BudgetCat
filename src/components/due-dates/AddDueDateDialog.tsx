@@ -10,7 +10,17 @@ import type { DueDateStatus, RepeatType } from "../../types/finance";
 import { Button } from "../ui/Button";
 import { Modal } from "../ui/Modal";
 
-export function AddDueDateDialog() {
+export function AddDueDateDialog({
+  className,
+  label = "Add Bill",
+  ariaLabel = label,
+  compact = false,
+}: {
+  className?: string;
+  label?: string;
+  ariaLabel?: string;
+  compact?: boolean;
+}) {
   const { user } = useAuth();
   const showToast = useToast();
   const [isOpen, setIsOpen] = useState(false);
@@ -80,20 +90,20 @@ export function AddDueDateDialog() {
         <form className="grid gap-4 sm:grid-cols-2" onSubmit={handleSubmit}>
           <label className="grid gap-2 text-sm font-bold">
             Title
-            <input className="budget-input" name="title" placeholder="Bill title" required />
+            <input className="bc-input" name="title" placeholder="Bill title" required />
           </label>
           <label className="grid gap-2 text-sm font-bold">
             Amount
-            <input className="budget-input" min="0" name="amount" placeholder="0" required type="number" />
+            <input className="bc-input" min="0" name="amount" placeholder="0" required type="number" />
           </label>
           <label className="grid gap-2 text-sm font-bold">
             Due Date
-            <input className="budget-input" name="due_date" required type="date" />
+            <input className="bc-input" name="due_date" required type="date" />
           </label>
           <label className="grid gap-2 text-sm font-bold">
             Repeat
             <select
-              className="budget-input"
+              className="bc-input"
               onChange={(event) => setRepeatType(event.target.value as RepeatType)}
               value={repeatType}
             >
@@ -105,12 +115,12 @@ export function AddDueDateDialog() {
           </label>
           <label className="grid gap-2 text-sm font-bold">
             Reminder Days
-            <input className="budget-input" defaultValue="3" min="0" name="reminder_days" type="number" />
+            <input className="bc-input" defaultValue="3" min="0" name="reminder_days" type="number" />
           </label>
           <label className="grid gap-2 text-sm font-bold">
             Status
             <select
-              className="budget-input"
+              className="bc-input"
               onChange={(event) => setStatus(event.target.value as DueDateStatus)}
               value={status}
             >
@@ -121,7 +131,7 @@ export function AddDueDateDialog() {
           </label>
           <label className="grid gap-2 text-sm font-bold sm:col-span-2">
             Note
-            <textarea className="budget-input min-h-24 resize-none" name="note" />
+            <textarea className="bc-input min-h-24 resize-none" name="note" />
           </label>
           <div className="flex flex-col-reverse gap-3 sm:col-span-2 sm:flex-row sm:justify-end">
             <Button disabled={isSaving} onClick={() => setIsOpen(false)} variant="secondary">
