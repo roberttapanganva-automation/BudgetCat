@@ -20,7 +20,10 @@ import {
 import { type FormEvent, useEffect, useMemo, useState } from "react";
 
 import { AddGoalDialog } from "../components/goals/AddGoalDialog";
-import { BudgetCatMascot } from "../components/mascot/BudgetCatMascot";
+import {
+  BudgetCatMascot,
+  type MascotVariant,
+} from "../components/mascot/BudgetCatMascot";
 import { AnimatedStatusIcon } from "../components/ui/AnimatedStatusIcon";
 import { Modal } from "../components/ui/Modal";
 import { useAuth } from "../contexts/AuthContext";
@@ -339,6 +342,32 @@ export function Goals() {
     savings: totalSaved,
     transactions: [],
   });
+  const featuredGoalProgress = featuredGoal ? getGoalProgress(featuredGoal) : 0;
+
+const isFeaturedGoalCompleted =
+  Boolean(featuredGoal) &&
+  (featuredGoal?.status === "completed" || featuredGoalProgress >= 100);
+
+const heroMascotVariant: MascotVariant =
+  goals.length === 0
+    ? "bonnie"
+    : isFeaturedGoalCompleted
+      ? "achieved"
+      : "savings";
+
+const heroMascotFrameClass =
+  heroMascotVariant === "achieved"
+    ? "h-[126px] w-[126px]"
+    : heroMascotVariant === "savings"
+      ? "h-[122px] w-[122px]"
+      : "h-[106px] w-[106px]";
+
+const heroMascotScaleClass =
+  heroMascotVariant === "achieved"
+    ? "scale-[1.20]"
+    : heroMascotVariant === "savings"
+      ? "scale-[1.20]"
+      : "scale-100";
 
   async function deleteGoal(goal: LocalGoal) {
     const confirmed = window.confirm(`Delete ${goal.title}?`);
@@ -375,39 +404,45 @@ export function Goals() {
           />
         </header>
 
-        <section className="bc-card-elevated mb-4 overflow-hidden p-4">
-          <div className="flex items-center gap-4">
-            <BudgetCatMascot
-              className="h-24 w-24 shrink-0"
-              imageClassName="h-full w-full object-contain drop-shadow-2xl"
-              variant={goals.length === 0 ? "bonnie" : "both"}
-            />
+      <section className="mb-4 overflow-visible border-0 bg-transparent px-0 py-1 shadow-none">
+  <div className="flex items-center gap-3 overflow-visible">
+    <BudgetCatMascot
+      className={cn(
+        "shrink-0 overflow-visible",
+        heroMascotFrameClass,
+      )}
+      imageClassName={cn(
+        "h-full w-full max-w-none origin-center object-contain object-center shadow-none drop-shadow-none transition-transform duration-300",
+        heroMascotScaleClass,
+      )}
+      variant={heroMascotVariant}
+    />
 
-            <div className="min-w-0 flex-1">
-              <div className="inline-flex items-center gap-2 rounded-full border border-[var(--bc-border)] bg-[var(--bc-card)] px-3 py-1 text-[11px] font-black text-[var(--bc-green)]">
-                <Sparkles className="h-3.5 w-3.5" />
-                {overallProgress}% overall
-              </div>
+    <div className="min-w-0 flex-1 self-center">
+      <div className="inline-flex items-center gap-2 rounded-full border border-[var(--bc-border)] bg-[var(--bc-card)] px-3 py-1 text-[11px] font-black text-[var(--bc-green)]">
+        <Sparkles className="h-3.5 w-3.5" />
+        {overallProgress}% overall
+      </div>
 
-              <h2 className="mt-3 text-xl font-black tracking-[-0.04em] text-[var(--bc-text)]">
-                {featuredGoal ? featuredGoal.title : "Start your first goal"}
-              </h2>
+      <h2 className="mt-3 text-xl font-black tracking-[-0.04em] text-[var(--bc-text)]">
+        {featuredGoal ? featuredGoal.title : "Start your first goal"}
+      </h2>
 
-              <p className="mt-1 text-xs font-semibold leading-relaxed text-[var(--bc-text-muted)]">
-                {goals.length === 0
-                  ? "Bonnie says: add your first goal to start building momentum."
-                  : mascotMood.message}
-              </p>
-            </div>
-          </div>
+      <p className="mt-1 text-xs font-semibold leading-relaxed text-[var(--bc-text-muted)]">
+        {goals.length === 0
+          ? "Bonnie says: add your first goal to start building momentum."
+          : mascotMood.message}
+      </p>
+    </div>
+  </div>
 
-          <div className="mt-4 bc-progress-track">
-            <div
-              className="bc-progress-fill"
-              style={{ width: `${overallProgress}%` }}
-            />
-          </div>
-        </section>
+  <div className="mt-3 bc-progress-track">
+    <div
+      className="bc-progress-fill"
+      style={{ width: `${overallProgress}%` }}
+    />
+  </div>
+</section>
 
         <section className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4">
           <div className="rounded-[20px] border border-[var(--bc-green)]/15 bg-[var(--bc-green-glow)] p-3">
