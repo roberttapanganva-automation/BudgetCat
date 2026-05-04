@@ -1,25 +1,39 @@
-import { BarChart3 } from "lucide-react";
+import {
+  Bell,
+  CalendarDays,
+  ChevronRight,
+  CircleDollarSign,
+  CreditCard,
+  Home,
+  Landmark,
+  ListChecks,
+  PiggyBank,
+  RefreshCw,
+  ReceiptText,
+  Settings,
+  ShieldCheck,
+  Target,
+  TrendingDown,
+  TrendingUp,
+  Wallet,
+  type LucideIcon,
+} from "lucide-react";
 import { useLiveQuery } from "dexie-react-hooks";
-import { format, parseISO } from "date-fns";
-import { useEffect, useState } from "react";
+import {
+  differenceInCalendarDays,
+  format,
+  parseISO,
+  subMonths,
+} from "date-fns";
+import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { CoachCard } from "../components/dashboard/CoachCard";
-import { MascotCard } from "../components/dashboard/MascotCard";
-import { PageHeader } from "../components/dashboard/PageHeader";
-import { PreviewPanel } from "../components/dashboard/PreviewPanel";
-import { StatCard } from "../components/dashboard/StatCard";
-import { BillStatusBadge } from "../components/due-dates/BillStatusBadge";
-import { SyncStatusIndicator } from "../components/layout/SyncStatusIndicator";
+
+import { ThemeToggle } from "../components/layout/ThemeToggle";
 import { BudgetCatMascot } from "../components/mascot/BudgetCatMascot";
-import { ReminderList } from "../components/reminders/ReminderCard";
-import { Badge } from "../components/ui/Badge";
-import { Card } from "../components/ui/Card";
-import { Progress } from "../components/ui/Progress";
+import { AddTransactionDialog } from "../components/transactions/AddTransactionDialog";
 import { useAuth } from "../contexts/AuthContext";
-import { getBudgetCatCoachMessages } from "../lib/budgetCatCoach";
 import {
   calculateMonthlySummary,
-  getDueDateStatus,
   getGoalMonthsLeft,
   getGoalProgress,
 } from "../lib/calculations";
@@ -28,19 +42,41 @@ import { getDashboardUpcomingBills } from "../lib/dueDateFilters";
 import { getDueDateIcon, getGoalIcon } from "../lib/iconMap";
 import { db } from "../lib/localDb";
 import { getDashboardMascotCheckIn } from "../lib/mascotMood";
-import { getMonthTrend } from "../lib/monthComparison";
 import { getDisplayNickname, nicknameEventName } from "../lib/nickname";
 import { getPaymentMethodLabel } from "../lib/paymentMethods";
 import { getAllReminders } from "../lib/reminders";
-import { formatCurrency } from "../lib/utils";
-import type { LocalTransaction } from "../types/finance";
+import { cn, formatCurrency } from "../lib/utils";
+import type {
+  LocalDueDate,
+  LocalTransaction,
+  Reminder,
+  TransactionType,
+} from "../types/finance";
+
+type StatTone = "green" | "red" | "amber" | "blue" | "purple";
+type DashboardPeriodOptionValue = number | "yearly";
+
+const dashboardMonthOptions = Array.from({ length: 12 }, (_, index) => ({
+  value: index,
+  label: format(new Date(2026, index, 1), "MMMM"),
+}));
+
+const dashboardPeriodOptions: Array<{
+  value: DashboardPeriodOptionValue;
+  label: string;
+}> = [
+  ...dashboardMonthOptions,
+  {
+    value: "yearly",
+    label: "Yearly",
+  },
+];
 
 function getTimeGreeting(date = new Date()) {
   const hour = date.getHours();
 
   if (hour < 12) return "Good morning";
   if (hour < 18) return "Good afternoon";
-
   return "Good evening";
 }
 
@@ -48,314 +84,663 @@ function safeText(value: unknown) {
   return typeof value === "string" ? value : "";
 }
 
+function safeDate(dateString?: string | null) {
+  if (!dateString) return null;
+
+  const parsedDate = parseISO(dateString);
+
+  if (Number.isNaN(parsedDate.getTime())) {
+    return null;
+  }
+
+  return parsedDate;
+}
+
+function formatDate(dateString?: string | null, dateFormat = "MMM d, yyyy") {
+  const parsedDate = safeDate(dateString);
+
+  if (!parsedDate) return "No date";
+  return format(parsedDate, dateFormat);
+}
+
+function isSameMonth(dateString: string, referenceDate: Date) {
+  const parsedDate = safeDate(dateString);
+
+  if (!parsedDate) return false;
+
+  return (
+    parsedDate.getMonth() === referenceDate.getMonth() &&
+    parsedDate.getFullYear() === referenceDate.getFullYear()
+  );
+}
+
+function getMonthlyBills(dueDates: LocalDueDate[], referenceDate = new Date()) {
+  return dueDates.filter((bill) => {
+    if (bill.deleted_at) return false;
+    return isSameMonth(bill.due_date, referenceDate);
+  });
+}
+
+function getYearlyBills(dueDates: LocalDueDate[], referenceDate = new Date()) {
+  const selectedYear = referenceDate.getFullYear();
+
+  return dueDates.filter((bill) => {
+    if (bill.deleted_at) return false;
+
+    const dueDate = safeDate(bill.due_date);
+
+    if (!dueDate) return false;
+
+    return dueDate.getFullYear() === selectedYear;
+  });
+}
+
+function getYearlySummary(
+  transactions: LocalTransaction[],
+  referenceDate = new Date(),
+) {
+  const selectedYear = referenceDate.getFullYear();
+
+  return Array.from({ length: 12 }, (_, monthIndex) =>
+    calculateMonthlySummary(
+      transactions,
+      new Date(selectedYear, monthIndex, 1),
+    ),
+  ).reduce(
+    (total, monthSummary) => ({
+      income: total.income + monthSummary.income,
+      expenses: total.expenses + monthSummary.expenses,
+      savings: total.savings + monthSummary.savings,
+      remaining: total.remaining + monthSummary.remaining,
+    }),
+    {
+      income: 0,
+      expenses: 0,
+      savings: 0,
+      remaining: 0,
+    },
+  );
+}
+
 function getPriorityRank(priority: string) {
   if (priority === "high") return 0;
   if (priority === "medium") return 1;
-
   return 2;
 }
 
-function getDashboardTransactionIcon(transaction: LocalTransaction) {
-  const normalizedCategory = normalizeCategory(transaction.category);
-  const categoryId = normalizedCategory?.id ?? safeText(transaction.category);
-  const categoryLabel = getCategoryLabel(transaction.category);
+function getBillDaysLeftLabel(bill: LocalDueDate) {
+  if (bill.status === "paid") return "Paid";
 
-  const searchableText = [
+  const dueDate = safeDate(bill.due_date);
+
+  if (!dueDate) return "No due date";
+
+  const daysLeft = differenceInCalendarDays(dueDate, new Date());
+
+  if (daysLeft < 0) {
+    return `${Math.abs(daysLeft)} day${
+      Math.abs(daysLeft) === 1 ? "" : "s"
+    } overdue`;
+  }
+
+  if (daysLeft === 0) return "Due today";
+  if (daysLeft === 1) return "1 day left";
+
+  return `${daysLeft} days left`;
+}
+
+function getTypeLabel(type: TransactionType) {
+  if (type === "goal_contribution") return "Goal Contribution";
+  return type
+    .split("_")
+    .map((word) => `${word.charAt(0).toUpperCase()}${word.slice(1)}`)
+    .join(" ");
+}
+
+function getTransactionSearchText(transaction: LocalTransaction) {
+  const normalizedCategory = normalizeCategory(transaction.category);
+
+  return [
     transaction.type,
-    categoryId,
-    categoryLabel,
-    safeText(transaction.note),
+    transaction.category,
+    normalizedCategory?.id,
+    normalizedCategory?.label,
+    transaction.note,
     getPaymentMethodLabel(transaction.payment_method),
   ]
+    .map((value) => safeText(value))
     .join(" ")
-    .toLowerCase();
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[_-]/g, " ")
+    .replace(/\s+/g, " ")
+    .toLowerCase()
+    .trim();
+}
 
-  // Income categories
-  if (
-    searchableText.includes("salary") ||
-    searchableText.includes("payroll") ||
-    searchableText.includes("wage")
-  ) {
-    return "💵";
-  }
+function getDashboardTransactionIcon(transaction: LocalTransaction) {
+  const text = getTransactionSearchText(transaction);
 
-  if (
-    searchableText.includes("freelance") ||
-    searchableText.includes("client") ||
-    searchableText.includes("project income")
-  ) {
-    return "💻";
-  }
-
-  if (
-    searchableText.includes("business_income") ||
-    searchableText.includes("business income") ||
-    searchableText.includes("business")
-  ) {
-    return "🏢";
-  }
-
-  if (
-    searchableText.includes("bonus") ||
-    searchableText.includes("gift_income") ||
-    searchableText.includes("gift income") ||
-    searchableText.includes("gift")
-  ) {
-    return "🎁";
-  }
-
-  if (searchableText.includes("allowance") || searchableText.includes("stipend")) {
-    return "🪙";
-  }
-
-  if (searchableText.includes("refund") || searchableText.includes("reimbursement")) {
-    return "↩️";
-  }
-
-  if (searchableText.includes("interest") || searchableText.includes("bank interest")) {
-    return "🏦";
-  }
-
-  if (searchableText.includes("other_income") || searchableText.includes("other income")) {
+  if (transaction.type === "salary" || text.includes("salary")) return "💵";
+  if (transaction.type === "income") {
+    if (text.includes("freelance") || text.includes("project")) return "💼";
+    if (text.includes("gift") || text.includes("bonus")) return "🎁";
+    if (text.includes("business")) return "🏦";
     return "💰";
   }
 
-  // Savings and goal categories
   if (
-    searchableText.includes("emergency_fund") ||
-    searchableText.includes("emergency fund") ||
-    searchableText.includes("emergency")
+    transaction.type === "savings" ||
+    transaction.type === "goal_contribution"
   ) {
-    return "🛟";
-  }
-
-  if (
-    searchableText.includes("travel_goal") ||
-    searchableText.includes("travel goal") ||
-    searchableText.includes("travel") ||
-    searchableText.includes("flight") ||
-    searchableText.includes("trip") ||
-    searchableText.includes("hotel")
-  ) {
-    return "✈️";
-  }
-
-  if (
-    searchableText.includes("home_goal") ||
-    searchableText.includes("home goal") ||
-    searchableText.includes("rent") ||
-    searchableText.includes("mortgage") ||
-    searchableText.includes("household") ||
-    searchableText.includes("house") ||
-    searchableText.includes("home")
-  ) {
-    return "🏠";
-  }
-
-  if (
-    searchableText.includes("gadget_goal") ||
-    searchableText.includes("gadget goal") ||
-    searchableText.includes("gadget") ||
-    searchableText.includes("phone") ||
-    searchableText.includes("laptop") ||
-    searchableText.includes("computer")
-  ) {
-    return "📱";
-  }
-
-  if (
-    searchableText.includes("education_goal") ||
-    searchableText.includes("education goal") ||
-    searchableText.includes("education") ||
-    searchableText.includes("school") ||
-    searchableText.includes("course") ||
-    searchableText.includes("learning")
-  ) {
-    return "📚";
-  }
-
-  if (
-    searchableText.includes("investment") ||
-    searchableText.includes("invest") ||
-    searchableText.includes("stock") ||
-    searchableText.includes("fund")
-  ) {
-    return "📈";
-  }
-
-  if (
-    searchableText.includes("general_savings") ||
-    searchableText.includes("general savings") ||
-    searchableText.includes("savings")
-  ) {
+    if (text.includes("travel") || text.includes("vacation")) return "✈️";
+    if (text.includes("emergency")) return "🛡️";
+    if (text.includes("home") || text.includes("house")) return "🏠";
+    if (text.includes("education") || text.includes("school")) return "📚";
     return "🌱";
   }
 
-  if (
-    searchableText.includes("other_goal") ||
-    searchableText.includes("other goal") ||
-    searchableText.includes("goal_contribution") ||
-    searchableText.includes("goal contribution")
-  ) {
-    return "🎯";
-  }
-
-  // Expense categories
-  if (
-    searchableText.includes("food_groceries") ||
-    searchableText.includes("food & groceries") ||
-    searchableText.includes("grocery") ||
-    searchableText.includes("groceries") ||
-    searchableText.includes("market")
-  ) {
-    return "🛒";
-  }
-
-  if (
-    searchableText.includes("dining_out") ||
-    searchableText.includes("dining out") ||
-    searchableText.includes("restaurant") ||
-    searchableText.includes("meal")
-  ) {
-    return "🍽️";
-  }
-
-  if (
-    searchableText.includes("coffee_snacks") ||
-    searchableText.includes("coffee") ||
-    searchableText.includes("snack")
-  ) {
-    return "☕";
-  }
-
-  if (
-    searchableText.includes("transportation") ||
-    searchableText.includes("transport") ||
-    searchableText.includes("commute") ||
-    searchableText.includes("car") ||
-    searchableText.includes("vehicle")
-  ) {
-    return "🚗";
-  }
-
-  if (searchableText.includes("fuel") || searchableText.includes("gas")) {
-    return "⛽";
-  }
-
-  if (
-    searchableText.includes("shopping") ||
-    searchableText.includes("shop") ||
-    searchableText.includes("store")
-  ) {
-    return "🛍️";
-  }
-
-  if (
-    searchableText.includes("health_medicine") ||
-    searchableText.includes("health") ||
-    searchableText.includes("medicine") ||
-    searchableText.includes("medical") ||
-    searchableText.includes("pharmacy")
-  ) {
-    return "💊";
-  }
-
-  if (
-    searchableText.includes("entertainment") ||
-    searchableText.includes("movie") ||
-    searchableText.includes("music") ||
-    searchableText.includes("game")
-  ) {
-    return "🎬";
-  }
-
-  if (
-    searchableText.includes("fitness") ||
-    searchableText.includes("gym") ||
-    searchableText.includes("workout")
-  ) {
-    return "🏋️";
-  }
-
-  if (
-    searchableText.includes("personal_care") ||
-    searchableText.includes("personal care") ||
-    searchableText.includes("salon") ||
-    searchableText.includes("hygiene")
-  ) {
-    return "🧴";
-  }
-
-  if (
-    searchableText.includes("pets") ||
-    searchableText.includes("pet") ||
-    searchableText.includes("cat") ||
-    searchableText.includes("dog")
-  ) {
+  if (text.includes("grocery") || text.includes("food")) return "🛒";
+  if (text.includes("dining") || text.includes("restaurant")) return "🍽️";
+  if (text.includes("coffee") || text.includes("snack")) return "☕";
+  if (text.includes("fuel") || text.includes("gasoline")) return "⛽";
+  if (text.includes("transport") || text.includes("commute")) return "🚌";
+  if (text.includes("shopping") || text.includes("store")) return "🛍️";
+  if (text.includes("health") || text.includes("medical")) return "🏥";
+  if (text.includes("education") || text.includes("course")) return "📚";
+  if (text.includes("entertainment") || text.includes("movie")) return "🎬";
+  if (text.includes("fitness") || text.includes("gym")) return "🏋️";
+  if (text.includes("pet") || text.includes("cat") || text.includes("dog")) {
     return "🐾";
   }
-
-  if (
-    searchableText.includes("fees_charges") ||
-    searchableText.includes("fees & charges") ||
-    searchableText.includes("fee") ||
-    searchableText.includes("charge")
-  ) {
-    return "🏦";
-  }
-
-  if (
-    searchableText.includes("debt_payment") ||
-    searchableText.includes("debt payment") ||
-    searchableText.includes("debt") ||
-    searchableText.includes("loan") ||
-    searchableText.includes("credit")
-  ) {
-    return "💳";
-  }
-
-  if (
-    searchableText.includes("electric") ||
-    searchableText.includes("electricity") ||
-    searchableText.includes("power")
-  ) {
-    return "⚡";
-  }
-
-  if (searchableText.includes("water")) return "💧";
-
-  if (
-    searchableText.includes("internet") ||
-    searchableText.includes("wifi") ||
-    searchableText.includes("web")
-  ) {
-    return "🌐";
-  }
-
-  if (searchableText.includes("mobile") || searchableText.includes("load")) {
-    return "📱";
-  }
-
-  if (
-    searchableText.includes("other_expense") ||
-    searchableText.includes("other expense")
-  ) {
-    return "🧾";
-  }
-
-  // Type fallback
-  if (transaction.type === "salary") return "💵";
-  if (transaction.type === "income") return "💰";
-  if (transaction.type === "savings") return "🌱";
-  if (transaction.type === "goal_contribution") return "🎯";
+  if (text.includes("electric") || text.includes("power")) return "⚡";
+  if (text.includes("water")) return "💧";
+  if (text.includes("internet") || text.includes("wifi")) return "🌐";
+  if (text.includes("phone") || text.includes("mobile")) return "📱";
+  if (text.includes("rent") || text.includes("mortgage")) return "🏠";
+  if (text.includes("subscription")) return "🔁";
 
   return "🧾";
+}
+
+function isIncomeTransaction(transaction: LocalTransaction) {
+  return transaction.type === "income" || transaction.type === "salary";
+}
+
+function isSavingsTransaction(transaction: LocalTransaction) {
+  return (
+    transaction.type === "savings" || transaction.type === "goal_contribution"
+  );
+}
+
+function getTrendLabel(
+  currentValue: number,
+  previousValue: number,
+  lowerIsBetter = false,
+  comparisonLabel = "last month",
+) {
+  if (previousValue <= 0 && currentValue <= 0) {
+    return {
+      label: "No activity yet",
+      positive: true,
+    };
+  }
+
+  if (previousValue <= 0 && currentValue > 0) {
+    return {
+      label: `New vs ${comparisonLabel}`,
+      positive: !lowerIsBetter,
+    };
+  }
+
+  const delta = currentValue - previousValue;
+  const percentage = Math.round((delta / previousValue) * 100);
+  const positive = lowerIsBetter ? delta <= 0 : delta >= 0;
+
+  return {
+    label: `${percentage >= 0 ? "+" : ""}${percentage}% vs ${comparisonLabel}`,
+    positive,
+  };
+}
+
+function getRemainingPercent(income: number, remaining: number) {
+  if (income <= 0) return 0;
+
+  return Math.max(0, Math.min(100, Math.round((remaining / income) * 100)));
+}
+
+function getSpendingPercent(income: number, expenses: number) {
+  if (income <= 0) return 0;
+
+  return Math.max(0, Math.min(100, Math.round((expenses / income) * 100)));
+}
+
+function getReminderToneClass(reminder: Reminder) {
+  if (reminder.severity === "urgent") {
+    return "border-[var(--bc-red)]/25 bg-[var(--bc-red-glow)] text-[var(--bc-red)]";
+  }
+
+  if (reminder.severity === "warning") {
+    return "border-[var(--bc-amber)]/25 bg-[var(--bc-amber-glow)] text-[var(--bc-amber)]";
+  }
+
+  if (reminder.severity === "success") {
+    return "border-[var(--bc-green)]/25 bg-[var(--bc-green-glow)] text-[var(--bc-green)]";
+  }
+
+  return "border-[var(--bc-blue)]/25 bg-[var(--bc-blue)]/10 text-[var(--bc-blue)]";
+}
+
+const statToneClasses: Record<
+  StatTone,
+  {
+    card: string;
+    icon: string;
+    value: string;
+    graph: string;
+    graphFill: string;
+  }
+> = {
+  green: {
+    card: "bc-stat-card-green",
+    icon: "bc-icon-circle-green",
+    value: "text-[var(--bc-green)]",
+    graph: "text-[var(--bc-green)]",
+    graphFill: "bg-[var(--bc-green-glow)]",
+  },
+  red: {
+    card: "bc-stat-card-red",
+    icon: "bc-icon-circle-red",
+    value: "text-[var(--bc-red)]",
+    graph: "text-[var(--bc-red)]",
+    graphFill: "bg-[var(--bc-red-glow)]",
+  },
+  amber: {
+    card: "bc-stat-card-amber",
+    icon: "bc-icon-circle-amber",
+    value: "text-[var(--bc-amber)]",
+    graph: "text-[var(--bc-amber)]",
+    graphFill: "bg-[var(--bc-amber-glow)]",
+  },
+  blue: {
+    card: "bc-stat-card-blue",
+    icon: "bc-icon-circle-blue",
+    value: "text-[var(--bc-blue)]",
+    graph: "text-[var(--bc-blue)]",
+    graphFill: "bg-[var(--bc-blue)]/10",
+  },
+  purple: {
+    card: "bc-stat-card-blue",
+    icon: "bg-[var(--bc-purple)]/15 text-[var(--bc-purple)]",
+    value: "text-[var(--bc-purple)]",
+    graph: "text-[var(--bc-purple)]",
+    graphFill: "bg-[var(--bc-purple)]/10",
+  },
+};
+type DashboardSparklineMetric = "income" | "expenses" | "savings";
+
+type DashboardSparklinePoint = {
+  label: string;
+  value: number;
+};
+
+function isTransactionForSparklineMetric(
+  transaction: LocalTransaction,
+  metric: DashboardSparklineMetric,
+) {
+  if (transaction.deleted_at) return false;
+
+  if (metric === "income") {
+    return transaction.type === "income" || transaction.type === "salary";
+  }
+
+  if (metric === "expenses") {
+    return transaction.type === "expense";
+  }
+
+  return (
+    transaction.type === "savings" ||
+    transaction.type === "goal_contribution"
+  );
+}
+
+function getDaysInSelectedMonth(referenceDate: Date) {
+  return new Date(
+    referenceDate.getFullYear(),
+    referenceDate.getMonth() + 1,
+    0,
+  ).getDate();
+}
+
+function createPeriodSparklinePoints(
+  values: number[],
+  labels: string[],
+): DashboardSparklinePoint[] {
+  return values.map((value, index) => ({
+    label: labels[index] ?? `${index + 1}`,
+    value: Math.max(0, value),
+  }));
+}
+
+function getMonthlyTransactionSparklinePoints(
+  transactions: LocalTransaction[],
+  referenceDate: Date,
+  metric: DashboardSparklineMetric,
+) {
+  const daysInMonth = getDaysInSelectedMonth(referenceDate);
+  const dailyTotals = Array.from({ length: daysInMonth }, () => 0);
+  const labels = Array.from({ length: daysInMonth }, (_, index) =>
+    `${index + 1}`,
+  );
+
+  transactions.forEach((transaction) => {
+    if (!isTransactionForSparklineMetric(transaction, metric)) return;
+
+    const transactionDate = safeDate(transaction.date);
+
+    if (!transactionDate) return;
+
+    const isSelectedMonth =
+      transactionDate.getMonth() === referenceDate.getMonth() &&
+      transactionDate.getFullYear() === referenceDate.getFullYear();
+
+    if (!isSelectedMonth) return;
+
+    const dayIndex = transactionDate.getDate() - 1;
+    dailyTotals[dayIndex] += transaction.amount;
+  });
+
+  return createPeriodSparklinePoints(dailyTotals, labels);
+}
+
+function getMonthlyBillSparklinePoints(
+  dueDates: LocalDueDate[],
+  referenceDate: Date,
+) {
+  const daysInMonth = getDaysInSelectedMonth(referenceDate);
+  const dailyTotals = Array.from({ length: daysInMonth }, () => 0);
+  const labels = Array.from({ length: daysInMonth }, (_, index) =>
+    `${index + 1}`,
+  );
+
+  dueDates.forEach((bill) => {
+    if (bill.deleted_at) return;
+
+    const dueDate = safeDate(bill.due_date);
+
+    if (!dueDate) return;
+
+    const isSelectedMonth =
+      dueDate.getMonth() === referenceDate.getMonth() &&
+      dueDate.getFullYear() === referenceDate.getFullYear();
+
+    if (!isSelectedMonth) return;
+
+    const dayIndex = dueDate.getDate() - 1;
+    dailyTotals[dayIndex] += bill.amount;
+  });
+
+  return createPeriodSparklinePoints(dailyTotals, labels);
+}
+
+function getYearlyTransactionSparklinePoints(
+  transactions: LocalTransaction[],
+  referenceDate: Date,
+  metric: DashboardSparklineMetric,
+) {
+  const selectedYear = referenceDate.getFullYear();
+  const monthlyTotals = Array.from({ length: 12 }, () => 0);
+  const labels = Array.from({ length: 12 }, (_, index) =>
+    format(new Date(selectedYear, index, 1), "MMM"),
+  );
+
+  transactions.forEach((transaction) => {
+    if (!isTransactionForSparklineMetric(transaction, metric)) return;
+
+    const transactionDate = safeDate(transaction.date);
+
+    if (!transactionDate) return;
+    if (transactionDate.getFullYear() !== selectedYear) return;
+
+    monthlyTotals[transactionDate.getMonth()] += transaction.amount;
+  });
+
+  return createPeriodSparklinePoints(monthlyTotals, labels);
+}
+
+function getYearlyBillSparklinePoints(
+  dueDates: LocalDueDate[],
+  referenceDate: Date,
+) {
+  const selectedYear = referenceDate.getFullYear();
+  const monthlyTotals = Array.from({ length: 12 }, () => 0);
+  const labels = Array.from({ length: 12 }, (_, index) =>
+    format(new Date(selectedYear, index, 1), "MMM"),
+  );
+
+  dueDates.forEach((bill) => {
+    if (bill.deleted_at) return;
+
+    const dueDate = safeDate(bill.due_date);
+
+    if (!dueDate) return;
+    if (dueDate.getFullYear() !== selectedYear) return;
+
+    monthlyTotals[dueDate.getMonth()] += bill.amount;
+  });
+
+  return createPeriodSparklinePoints(monthlyTotals, labels);
+}
+
+function DashboardStatSparkline({
+  points,
+  tone,
+}: {
+  points: DashboardSparklinePoint[];
+  tone: StatTone;
+}) {
+  const toneClass = statToneClasses[tone];
+
+  const safePoints =
+    points.length >= 2
+      ? points.map((point) => ({
+          ...point,
+          value: Math.max(0, point.value),
+        }))
+      : [
+          { label: "Start", value: 0 },
+          { label: "End", value: 0 },
+        ];
+
+  const maxValue = Math.max(...safePoints.map((point) => point.value), 0);
+  const chartWidth = 136;
+  const chartHeight = 54;
+  const paddingX = 3;
+  const paddingY = 7;
+  const baselineY = chartHeight - 4;
+
+  const chartPoints = safePoints.map((point, index) => {
+    const x =
+      safePoints.length === 1
+        ? chartWidth / 2
+        : paddingX +
+          (index / (safePoints.length - 1)) * (chartWidth - paddingX * 2);
+
+    const y =
+      maxValue <= 0
+        ? chartHeight / 2
+        : paddingY +
+          (1 - point.value / maxValue) * (chartHeight - paddingY * 2);
+
+    return {
+      ...point,
+      x,
+      y,
+    };
+  });
+
+  const linePoints = chartPoints
+    .map((point) => `${point.x},${point.y}`)
+    .join(" ");
+
+  const areaPoints =
+    chartPoints.length > 1
+      ? `${linePoints} ${
+          chartPoints[chartPoints.length - 1].x
+        },${baselineY} ${chartPoints[0].x},${baselineY}`
+      : "";
+
+  return (
+    <div className="flex min-w-[132px] items-center justify-end">
+      <div className={cn("w-[132px]", toneClass.graph)}>
+        <svg
+          aria-label="Selected period activity graph"
+          className="h-[54px] w-full overflow-visible"
+          preserveAspectRatio="none"
+          viewBox={`0 0 ${chartWidth} ${chartHeight}`}
+        >
+          {areaPoints ? (
+            <polygon fill="currentColor" opacity="0.08" points={areaPoints} />
+          ) : null}
+
+          <polyline
+            fill="none"
+            opacity={maxValue <= 0 ? "0.45" : "1"}
+            points={linePoints}
+            stroke="currentColor"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth="3"
+          />
+
+          <line
+            opacity="0.16"
+            stroke="currentColor"
+            strokeLinecap="round"
+            strokeWidth="1"
+            x1={paddingX}
+            x2={chartWidth - paddingX}
+            y1={baselineY}
+            y2={baselineY}
+          />
+        </svg>
+      </div>
+    </div>
+  );
+}
+function DashboardStatCard({
+  title,
+  value,
+  helper,
+  icon: Icon,
+  tone,
+  trend,
+  trendPoints,
+}: {
+  title: string;
+  value: string;
+  helper: string;
+  icon: LucideIcon;
+  tone: StatTone;
+  trend?: {
+    label: string;
+    positive: boolean;
+  };
+  trendPoints: DashboardSparklinePoint[];
+}) {
+  const toneClass = statToneClasses[tone];
+
+  return (
+    <article className={cn("bc-stat-card p-4", toneClass.card)}>
+      <div className="flex items-start justify-between gap-3">
+        <div className={cn("bc-icon-circle h-9 w-9", toneClass.icon)}>
+          <Icon className="h-4.5 w-4.5" strokeWidth={2.4} />
+        </div>
+
+        {trend && (
+          <span
+            className={cn(
+              "inline-flex max-w-[160px] items-center gap-1 truncate rounded-full px-2 py-1 text-[10px] font-black",
+              trend.positive
+                ? "bg-[var(--bc-green-glow)] text-[var(--bc-green)]"
+                : "bg-[var(--bc-red-glow)] text-[var(--bc-red)]",
+            )}
+          >
+            {trend.positive ? (
+              <TrendingUp className="h-3 w-3 shrink-0" />
+            ) : (
+              <TrendingDown className="h-3 w-3 shrink-0" />
+            )}
+            <span className="truncate">{trend.label}</span>
+          </span>
+        )}
+      </div>
+
+      <div className="mt-4 grid grid-cols-[minmax(0,1fr)_auto] items-end gap-3">
+        <div className="min-w-0">
+          <p className="text-xs font-black text-[var(--bc-text-soft)]">
+            {title}
+          </p>
+
+          <p
+            className={cn(
+              "mt-1 text-2xl font-black leading-none tracking-[-0.04em]",
+              toneClass.value,
+            )}
+          >
+            {value}
+          </p>
+
+          <p className="mt-2 text-[11px] font-semibold leading-snug text-[var(--bc-text-muted)]">
+            {helper}
+          </p>
+        </div>
+
+        <DashboardStatSparkline points={trendPoints} tone={tone} />
+      </div>
+    </article>
+  );
+}
+function SectionHeader({
+  title,
+  actionLabel,
+  to,
+}: {
+  title: string;
+  actionLabel?: string;
+  to?: string;
+}) {
+  return (
+    <div className="mb-3 flex items-center justify-between gap-3">
+      <h2 className="text-base font-black tracking-[-0.02em] text-[var(--bc-text)]">
+        {title}
+      </h2>
+
+      {actionLabel && to ? (
+        <Link
+          className="inline-flex items-center gap-1 text-xs font-black text-[var(--bc-green)]"
+          to={to}
+        >
+          {actionLabel}
+          <ChevronRight className="h-3.5 w-3.5" />
+        </Link>
+      ) : null}
+    </div>
+  );
+}
+function EmptyState({ children }: { children: ReactNode }) {
+  return (
+    <div className="rounded-[18px] border border-dashed border-[var(--bc-border)] bg-[var(--bc-card)]/55 px-4 py-5 text-center text-sm font-semibold text-[var(--bc-text-muted)]">
+      {children}
+    </div>
+  );
 }
 
 export function Dashboard() {
   const { user } = useAuth();
   const householdId = user?.householdId ?? "";
   const [nickname, setNickname] = useState(() => getDisplayNickname(user));
+  const [showNotifications, setShowNotifications] = useState(false);
 
   const transactions =
     useLiveQuery(
@@ -395,7 +780,11 @@ export function Dashboard() {
 
   const pendingSyncCount =
     useLiveQuery(
-      () => db.sync_queue.where("sync_status").anyOf(["pending", "failed"]).count(),
+      () =>
+        db.sync_queue
+          .where("sync_status")
+          .anyOf(["pending", "failed"])
+          .count(),
       [],
       0,
     ) ?? 0;
@@ -409,15 +798,106 @@ export function Dashboard() {
     return () => window.removeEventListener(nicknameEventName, updateNickname);
   }, [user]);
 
-  const summary = calculateMonthlySummary(transactions);
-  const incomeTrend = getMonthTrend(transactions, "income");
-  const expensesTrend = getMonthTrend(transactions, "expenses");
-  const savingsTrend = getMonthTrend(transactions, "savings");
+  const today = useMemo(() => new Date(), []);
+  const [selectedMonth, setSelectedMonth] = useState(today.getMonth());
+  const [isMonthMenuOpen, setIsMonthMenuOpen] = useState(false);
+  const [isYearlyView, setIsYearlyView] = useState(false);
+  const selectedYear = today.getFullYear();
+
+  const selectedDate = useMemo(
+    () => new Date(selectedYear, selectedMonth, 1),
+    [selectedMonth, selectedYear],
+  );
+
+  const previousMonth = useMemo(() => subMonths(selectedDate, 1), [selectedDate]);
+  const previousYearDate = useMemo(
+    () => new Date(selectedYear - 1, selectedMonth, 1),
+    [selectedMonth, selectedYear],
+  );
+
+  const summary = calculateMonthlySummary(transactions, selectedDate);
+  const previousSummary = calculateMonthlySummary(transactions, previousMonth);
+
+  const yearlySummary = useMemo(
+    () => getYearlySummary(transactions, selectedDate),
+    [transactions, selectedDate],
+  );
+
+  const previousYearSummary = useMemo(
+    () => getYearlySummary(transactions, previousYearDate),
+    [transactions, previousYearDate],
+  );
+
+  const currentMonthBills = getMonthlyBills(dueDates, selectedDate);
+  const previousMonthBills = getMonthlyBills(dueDates, previousMonth);
+  const yearlyBills = getYearlyBills(dueDates, selectedDate);
+  const previousYearBills = getYearlyBills(dueDates, previousYearDate);
+
+  const billsTotal = currentMonthBills.reduce(
+    (sum, bill) => sum + bill.amount,
+    0,
+  );
+
+  const previousBillsTotal = previousMonthBills.reduce(
+    (sum, bill) => sum + bill.amount,
+    0,
+  );
+
+  const yearlyBillsTotal = yearlyBills.reduce(
+    (sum, bill) => sum + bill.amount,
+    0,
+  );
+
+  const previousYearBillsTotal = previousYearBills.reduce(
+    (sum, bill) => sum + bill.amount,
+    0,
+  );
+
+  const statSummary = isYearlyView ? yearlySummary : summary;
+  const statComparisonSummary = isYearlyView
+    ? previousYearSummary
+    : previousSummary;
+  const statBills = isYearlyView ? yearlyBills : currentMonthBills;
+  const statBillsTotal = isYearlyView ? yearlyBillsTotal : billsTotal;
+  const statComparisonBillsTotal = isYearlyView
+    ? previousYearBillsTotal
+    : previousBillsTotal;
+
+ const incomeSparklinePoints = isYearlyView
+  ? getYearlyTransactionSparklinePoints(transactions, selectedDate, "income")
+  : getMonthlyTransactionSparklinePoints(transactions, selectedDate, "income");
+
+const expenseSparklinePoints = isYearlyView
+  ? getYearlyTransactionSparklinePoints(transactions, selectedDate, "expenses")
+  : getMonthlyTransactionSparklinePoints(
+      transactions,
+      selectedDate,
+      "expenses",
+    );
+
+const savingsSparklinePoints = isYearlyView
+  ? getYearlyTransactionSparklinePoints(transactions, selectedDate, "savings")
+  : getMonthlyTransactionSparklinePoints(
+      transactions,
+      selectedDate,
+      "savings",
+    );
+
+const billsSparklinePoints = isYearlyView
+  ? getYearlyBillSparklinePoints(dueDates, selectedDate)
+  : getMonthlyBillSparklinePoints(dueDates, selectedDate);
+
+  const statComparisonLabel = isYearlyView ? "last year" : "last month";
+  const activePeriodLabel = isYearlyView
+    ? "Yearly"
+    : dashboardMonthOptions.find((month) => month.value === selectedMonth)
+        ?.label ?? "This Month";
 
   const activeGoals = [...goals]
     .filter((goal) => goal.status === "active")
     .sort((a, b) => {
-      const priorityDelta = getPriorityRank(a.priority) - getPriorityRank(b.priority);
+      const priorityDelta =
+        getPriorityRank(a.priority) - getPriorityRank(b.priority);
 
       if (priorityDelta !== 0) return priorityDelta;
 
@@ -428,11 +908,10 @@ export function Dashboard() {
     .sort((a, b) => b.date.localeCompare(a.date))
     .slice(0, 4);
 
-  const previewGoals = [...activeGoals].slice(0, 2);
-  const upcomingBills = getDashboardUpcomingBills(dueDates, 2);
-
+  const previewGoals = activeGoals.slice(0, 2);
+  const featuredGoal = activeGoals[0];
+  const upcomingBills = getDashboardUpcomingBills(dueDates, 3);
   const reminders = getAllReminders(dueDates, goals, transactions);
-  const coachMessages = getBudgetCatCoachMessages({ transactions, dueDates, goals });
 
   const mascotCheckIn = getDashboardMascotCheckIn({
     dueDates,
@@ -445,474 +924,739 @@ export function Dashboard() {
     transactions,
   });
 
-  const spendingPercent =
-    summary.income > 0 ? Math.min(100, Math.round((summary.expenses / summary.income) * 100)) : 0;
+  const incomeTrend = getTrendLabel(
+    statSummary.income,
+    statComparisonSummary.income,
+    false,
+    statComparisonLabel,
+  );
 
-  const spendingTone =
-    spendingPercent >= 90
-      ? "bg-budget-urgent"
-      : spendingPercent >= 70
-        ? "bg-budget-cat"
-        : "bg-budget-primary";
+  const expenseTrend = getTrendLabel(
+    statSummary.expenses,
+    statComparisonSummary.expenses,
+    true,
+    statComparisonLabel,
+  );
 
-  const greeting = getTimeGreeting();
+  const billsTrend = getTrendLabel(
+    statBillsTotal,
+    statComparisonBillsTotal,
+    true,
+    statComparisonLabel,
+  );
+
+  const savingsTrend = getTrendLabel(
+    statSummary.savings,
+    statComparisonSummary.savings,
+    false,
+    statComparisonLabel,
+  );
+
+  const remainingPercent = getRemainingPercent(
+    summary.income,
+    summary.remaining,
+  );
+  const spendingPercent = getSpendingPercent(summary.income, summary.expenses);
+
+  const monthLabel = isYearlyView
+    ? `${selectedYear} Overview`
+    : format(selectedDate, "MMMM yyyy");
+  const greeting = getTimeGreeting(selectedDate);
+
+  const safeToSpend = Math.max(0, summary.remaining);
+  const cleanMascotMessage = mascotCheckIn.clyde.message
+    .replace(/\s*(🔄|🔁|↻)\s*$/u, "")
+    .trim();
 
   return (
-    <>
-      <div className="sm:hidden">
-        <section className="mb-4">
-          <h1 className="mt-1 text-2xl font-black leading-tight text-budget-text">
-            {greeting}, {nickname}
+    <div className="mx-auto w-full max-w-[430px] px-5 pb-[35px] pt-5 md:max-w-none md:px-0 md:pb-8 md:pt-0">
+      <header className="mb-5 flex items-center justify-between gap-4">
+        <div className="min-w-0">
+          <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[var(--bc-text-muted)]">
+            {monthLabel}
+          </p>
+          <h1 className="mt-1 truncate text-xl font-black tracking-[-0.04em] text-[var(--bc-text)] md:text-3xl">
+            {greeting}, {nickname}! 👋
           </h1>
-          <p className="mt-2 text-sm font-semibold leading-6 text-budget-text/65">
-            A live snapshot from your local BudgetCat data.
-          </p>
-        </section>
+        </div>
 
-        <section className="mb-4">
-          <div className="flex items-start gap-3 rounded-xl border border-budget-border bg-budget-card p-3">
-            <BudgetCatMascot
-              className="shrink-0"
-              imageClassName="w-[64px] object-contain"
-              variant="both"
-            />
-            <div className="min-w-0 pt-1">
-              <div className="mb-2">
-                <SyncStatusIndicator showProgress />
-              </div>
-              <p className="text-sm font-semibold leading-6 text-budget-text/70">
-                {mascotCheckIn.clyde.message}
-              </p>
-            </div>
-          </div>
-        </section>
+        <div className="flex items-center gap-2">
+          <ThemeToggle className="h-10 w-10 rounded-2xl border border-[var(--bc-border)] bg-[var(--bc-card)] text-[var(--bc-text)]" />
 
-        <section className="grid grid-cols-2 gap-3">
-          <StatCard
-            helper="Income minus expenses and savings"
-            icon="💰"
-            title="Remaining"
-            value={summary.remaining}
-          />
-          <StatCard
-            helper="Income and salary this month"
-            icon="💵"
-            title="Income"
-            tone="cat"
-            trend={incomeTrend}
-            value={summary.income}
-          />
-          <StatCard
-            helper="Expenses recorded this month"
-            icon="📉"
-            title="Expenses"
-            tone="urgent"
-            trend={expensesTrend}
-            value={summary.expenses}
-          />
-          <StatCard
-            helper="Savings and goal contributions"
-            icon="🌱"
-            title="Savings"
-            tone="success"
-            trend={savingsTrend}
-            value={summary.savings}
-          />
-        </section>
-
-        <Card className="mt-4 p-4">
-          <div className="flex items-center justify-between gap-3">
-            <p className="text-sm font-black uppercase tracking-[0.16em] text-budget-text/55">
-              Spending
-            </p>
-            <p className="text-sm font-semibold text-budget-text/60">
-              {formatCurrency(summary.expenses)} of {formatCurrency(summary.income)}
-            </p>
-          </div>
-
-          <div className="mt-3 h-2 overflow-hidden rounded-full bg-budget-background ring-1 ring-budget-border">
-            <div className={spendingTone} style={{ width: `${spendingPercent}%`, height: "100%" }} />
-          </div>
-
-          <p className="mt-2 text-xs font-semibold text-budget-text/55">
-            {spendingPercent}% spent this month
-          </p>
-        </Card>
-
-        <section className="mt-4">
-          <div className="mb-3 flex items-center justify-between gap-3">
-            <h2 className="text-lg font-black text-budget-text">Recent transactions</h2>
-            <Link className="text-sm font-bold text-budget-primary" to="/transactions">
-              View all
-            </Link>
-          </div>
-
-          <Card className="p-0">
-            <div className="divide-y divide-budget-border">
-              {recentTransactions.slice(0, 3).map((transaction) => {
-                const isPositive = transaction.type === "income" || transaction.type === "salary";
-                const transactionTypeLabel = transaction.type.replace("_", " ");
-
-                return (
-                  <div
-                    className="flex items-center justify-between gap-3 px-4 py-3"
-                    key={transaction.id}
-                  >
-                    <div className="min-w-0">
-                      <p className="flex min-w-0 items-center gap-2 font-black">
-                        <span aria-hidden="true" className="shrink-0 text-lg">
-                          {getDashboardTransactionIcon(transaction)}
-                        </span>
-                        <span className="truncate">{getCategoryLabel(transaction.category)}</span>
-                      </p>
-                      <p className="text-xs font-semibold capitalize text-budget-text/55">
-                        {transactionTypeLabel} - {format(parseISO(transaction.date), "MMM d")}
-                      </p>
-                    </div>
-
-                    <p
-                      className={
-                        isPositive
-                          ? "shrink-0 font-black text-budget-success"
-                          : "shrink-0 font-black text-budget-urgent"
-                      }
-                    >
-                      {isPositive ? "+" : "-"}
-                      {formatCurrency(transaction.amount)}
-                    </p>
-                  </div>
-                );
-              })}
-
-              {recentTransactions.length === 0 && (
-                <p className="px-4 py-5 text-sm font-semibold text-budget-text/55">
-                  No transactions yet.
-                </p>
-              )}
-            </div>
-          </Card>
-        </section>
-
-        <section className="mt-4">
-          <div className="mb-3 flex items-center justify-between gap-3">
-            <h2 className="text-lg font-black text-budget-text">Upcoming bills</h2>
-            <Link className="text-sm font-bold text-budget-primary" to="/due-dates">
-              View all
-            </Link>
-          </div>
-
-          <Card className="p-0">
-            <div className="divide-y divide-budget-border">
-              {upcomingBills.map((bill) => (
-                <div
-                  className="flex items-center justify-between gap-3 px-4 py-3"
-                  key={bill.id}
-                >
-                  <div className="flex min-w-0 items-center gap-3">
-                    <span aria-hidden="true" className="shrink-0 text-xl leading-none">
-                      {getDueDateIcon(bill)}
-                    </span>
-                    <div className="min-w-0">
-                      <p className="truncate font-black">{bill.title}</p>
-                      <p className="text-xs font-semibold text-budget-text/55">
-                        {format(parseISO(bill.due_date), "MMM d")} - {getDueDateStatus(bill)}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex shrink-0 items-center gap-2">
-                    <BillStatusBadge status={bill.status} />
-                    <p className="font-black text-budget-urgent">{formatCurrency(bill.amount)}</p>
-                  </div>
-                </div>
-              ))}
-
-              {upcomingBills.length === 0 && (
-                <p className="px-4 py-5 text-sm font-semibold text-budget-text/55">
-                  No unpaid bills right now.
-                </p>
-              )}
-            </div>
-          </Card>
-        </section>
-
-        <section className="mt-4">
-          <Link
-            className="flex items-center justify-between gap-3 rounded-xl border border-budget-border bg-budget-card px-4 py-3"
-            to="/goals"
+          <button
+            aria-expanded={showNotifications}
+            aria-label="Notifications"
+            className="relative flex h-10 w-10 items-center justify-center rounded-2xl border border-[var(--bc-border)] bg-[var(--bc-card)] text-[var(--bc-text)]"
+            onClick={() => setShowNotifications((current) => !current)}
+            type="button"
           >
-            <div className="min-w-0">
-              <p className="font-black text-budget-text">Goals</p>
-              <p className="mt-1 text-xs font-semibold text-budget-text/55">
-                Set your savings targets and track them right from your dashboard.
+            <Bell className="h-4.5 w-4.5" strokeWidth={2.4} />
+            {reminders.length > 0 && (
+              <span className="absolute right-2 top-2 h-2.5 w-2.5 rounded-full border-2 border-[var(--bc-card)] bg-[var(--bc-red)]" />
+            )}
+          </button>
+
+          <Link
+            aria-label="Settings"
+            className="hidden h-10 w-10 items-center justify-center rounded-2xl border border-[var(--bc-border)] bg-[var(--bc-card)] text-[var(--bc-text)] md:flex"
+            to="/settings"
+          >
+            <Settings className="h-4.5 w-4.5" strokeWidth={2.4} />
+          </Link>
+        </div>
+      </header>
+
+      {showNotifications && (
+        <section className="bc-card mb-4 p-4">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <div>
+              <h2 className="text-base font-black text-[var(--bc-text)]">
+                Notifications
+              </h2>
+              <p className="mt-1 text-xs font-semibold text-[var(--bc-text-muted)]">
+                Bills, goals, and sync reminders from your real BudgetCat data.
               </p>
             </div>
-            <span className="shrink-0 rounded-full bg-budget-primary/10 px-3 py-1 text-xs font-black text-budget-primary">
-              View all
-            </span>
-          </Link>
-        </section>
 
-        <section className="mt-4">
-          <div className="mb-3 flex items-center justify-between gap-3">
-            <h2 className="text-lg font-black text-budget-text">Goals preview</h2>
-            <Link className="text-sm font-bold text-budget-primary" to="/goals">
-              View all
-            </Link>
+            <button
+              className="rounded-full border border-[var(--bc-border)] bg-[var(--bc-surface-soft)] px-3 py-1 text-xs font-black text-[var(--bc-text-muted)]"
+              onClick={() => setShowNotifications(false)}
+              type="button"
+            >
+              Close
+            </button>
           </div>
 
-          <Card className="p-0">
-            <div className="divide-y divide-budget-border">
-              {previewGoals.slice(0, 2).map((goal) => {
-                const progress = getGoalProgress(goal);
-                const targetDate = goal.target_date ? format(parseISO(goal.target_date), "MMM d") : "";
-
-                return (
-                  <div
-                    className="flex items-center justify-between gap-3 px-4 py-3"
-                    key={goal.id}
-                  >
-                    <div className="flex min-w-0 items-center gap-3">
-                      <span aria-hidden="true" className="shrink-0 text-xl leading-none">
-                        {getGoalIcon(goal)}
-                      </span>
-                      <div className="min-w-0">
-                        <p className="truncate font-black">{goal.title}</p>
-                        <p className="text-xs font-semibold text-budget-text/55">
-                          {formatCurrency(goal.current_amount)} / {formatCurrency(goal.target_amount)}
-                          {targetDate ? ` - ${targetDate}` : ""}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex shrink-0 flex-col items-end gap-1">
-                      <span className="rounded-full bg-budget-primary/10 px-3 py-1 text-xs font-black text-budget-primary">
-                        {progress}%
-                      </span>
-                      <span className="text-xs font-semibold text-budget-text/55">
-                        {getGoalMonthsLeft(goal)} mo left
-                      </span>
-                    </div>
-                  </div>
-                );
-              })}
-
-              {previewGoals.length === 0 && (
-                <div className="px-4 py-5 text-sm font-semibold text-budget-text/55">
-                  No active goals yet.
+          <div className="space-y-2">
+            {reminders.slice(0, 4).map((reminder) => (
+              <div
+                className="flex items-start gap-3 rounded-[18px] border border-[var(--bc-border)] bg-[var(--bc-surface-soft)]/60 p-3"
+                key={reminder.id}
+              >
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[var(--bc-border)] bg-[var(--bc-card)] text-lg">
+                  {reminder.icon || "🔔"}
                 </div>
-              )}
-            </div>
-          </Card>
-        </section>
-      </div>
 
-      <div className="hidden sm:block">
-        <PageHeader
-          subtitle="A live snapshot from your local BudgetCat data."
-          title={`${greeting}, ${nickname}`}
-        />
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-black text-[var(--bc-text)]">
+                    {reminder.title}
+                  </p>
+                  <p className="mt-1 text-xs font-semibold leading-relaxed text-[var(--bc-text-muted)]">
+                    {reminder.body}
+                  </p>
+                </div>
+              </div>
+            ))}
 
-        <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <StatCard
-            helper="Income minus expenses and savings"
-            icon="💰"
-            title="Remaining Money"
-            value={summary.remaining}
-          />
-          <StatCard
-            helper="Income and salary this month"
-            icon="💵"
-            title="This Month Income"
-            tone="cat"
-            trend={incomeTrend}
-            value={summary.income}
-          />
-          <StatCard
-            helper="Expenses recorded this month"
-            icon="📉"
-            title="This Month Expenses"
-            tone="urgent"
-            trend={expensesTrend}
-            value={summary.expenses}
-          />
-          <StatCard
-            helper="Savings and goal contributions"
-            icon="🌱"
-            title="This Month Savings"
-            tone="success"
-            trend={savingsTrend}
-            value={summary.savings}
-          />
-        </section>
-
-        <section className="mt-6 grid gap-4 lg:grid-cols-[1fr_1.2fr]">
-          <CoachCard message={coachMessages[0]} />
-
-          <div className="rounded-lg border border-budget-border bg-budget-card p-4">
-            <div className="mb-3 flex items-center justify-between gap-3">
-              <h2 className="text-lg font-black">Top reminders</h2>
-              <Badge tone={reminders.length > 0 ? "warning" : "success"}>
-                {reminders.length} active
-              </Badge>
-            </div>
-            <ReminderList
-              emptyText="No urgent reminders right now."
-              limit={3}
-              reminders={reminders}
-            />
+            {reminders.length === 0 && (
+              <div className="rounded-[18px] border border-[var(--bc-green)]/20 bg-[var(--bc-green-glow)] p-4 text-center">
+                <p className="text-sm font-black text-[var(--bc-text)]">
+                  No notifications right now
+                </p>
+                <p className="mt-1 text-xs font-semibold text-[var(--bc-text-muted)]">
+                  Bonnie and Clyde say everything looks calm.
+                </p>
+              </div>
+            )}
           </div>
         </section>
+      )}
 
-        <section className="mt-6 grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
-          <MascotCard checkIn={mascotCheckIn} />
+      <section className="grid gap-4 xl:grid-cols-[1.05fr_0.95fr]">
+        <div className="space-y-4">
+          <article className="relative z-30 min-h-[176px] overflow-visible px-3 py-2">
+            <div className="pointer-events-none absolute inset-y-0 right-0 z-0 w-[52%] overflow-hidden">
+              <BudgetCatMascot
+                className="absolute inset-0 flex h-full w-full items-center justify-center"
+                imageClassName="h-full w-full scale-[4.50] object-contain object-center drop-shadow-2xl"
+                variant="both"
+              />
+            </div>
 
-          <div className="grid gap-6">
-            <PreviewPanel title="Upcoming due dates" to="/due-dates">
-              <div className="grid gap-3">
-                {upcomingBills.map((bill) => (
-                  <div
-                    className="flex min-w-0 items-center justify-between gap-3 rounded-lg bg-budget-background p-3"
-                    key={bill.id}
-                  >
-                    <div className="flex min-w-0 items-center gap-3">
-                      <div className="grid h-10 w-10 shrink-0 place-items-center text-xl">
-                        <span aria-hidden="true">{getDueDateIcon(bill)}</span>
-                      </div>
-                      <div className="min-w-0">
-                        <p className="truncate font-black">{bill.title}</p>
-                        <p className="text-xs font-semibold text-budget-text/55">
-                          {formatCurrency(bill.amount)} - {getDueDateStatus(bill)}
-                        </p>
-                      </div>
+            <div className="relative z-10 flex min-h-[150px] max-w-[55%] flex-col justify-between">
+              <div>
+                <div className="inline-flex items-center gap-2 rounded-full border border-[var(--bc-border)] bg-[var(--bc-card)]/80 px-3 py-1 text-[11px] font-black text-[var(--bc-green)]">
+                  <ShieldCheck className="h-3.5 w-3.5" />
+                  {pendingSyncCount > 0
+                    ? `${pendingSyncCount} pending sync`
+                    : "All synced"}
+                </div>
+
+                <h2 className="mt-5 text-3xl font-black tracking-[-0.06em] text-[var(--bc-text)]">
+                  BudgetCat
+                </h2>
+                <p className="mt-1 text-sm font-semibold text-[var(--bc-text-muted)]">
+                  Smart ∙ Friendly ∙ Focused.
+                </p>
+              </div>
+
+              <div
+                className="relative mt-4 w-fit"
+                onBlur={(event) => {
+                  if (!event.currentTarget.contains(event.relatedTarget)) {
+                    setIsMonthMenuOpen(false);
+                  }
+                }}
+              >
+                <button
+                  aria-expanded={isMonthMenuOpen}
+                  aria-label="Dashboard period"
+                  className="flex h-9 min-w-[116px] items-center justify-between gap-2 rounded-2xl border border-[var(--bc-border)] bg-[var(--bc-card)] px-3 text-xs font-black text-[var(--bc-text-soft)]"
+                  onClick={() => setIsMonthMenuOpen((current) => !current)}
+                  type="button"
+                >
+                  <span className="flex items-center gap-2">
+                    <CalendarDays className="h-4 w-4 shrink-0 text-[var(--bc-green)]" />
+                    {activePeriodLabel}
+                  </span>
+
+                  <span className="text-[10px] text-[var(--bc-text-muted)]">
+                    ▾
+                  </span>
+                </button>
+
+                {isMonthMenuOpen && (
+                  <div className="absolute left-0 top-11 z-[999] w-[132px] overflow-hidden rounded-2xl border border-[var(--bc-border)] bg-[var(--bc-card)] p-1 shadow-xl">
+                    <div className="max-h-[164px] overflow-y-auto pr-1">
+                      {dashboardPeriodOptions.map((option) => {
+                        const isActive =
+                          option.value === "yearly"
+                            ? isYearlyView
+                            : !isYearlyView && option.value === selectedMonth;
+
+                        return (
+                          <button
+                            className={cn(
+                              "flex h-8 w-full items-center rounded-xl px-3 text-left text-xs font-black transition",
+                              isActive
+                                ? "bg-[var(--bc-green-glow)] text-[var(--bc-green)]"
+                                : "text-[var(--bc-text-soft)] hover:bg-[var(--bc-surface-soft)]",
+                            )}
+                            key={String(option.value)}
+                            onClick={() => {
+                              if (option.value === "yearly") {
+                                setIsYearlyView(true);
+                              } else {
+                                setSelectedMonth(option.value);
+                                setIsYearlyView(false);
+                              }
+
+                              setIsMonthMenuOpen(false);
+                            }}
+                            type="button"
+                          >
+                            {option.label}
+                          </button>
+                        );
+                      })}
                     </div>
-                    <BillStatusBadge status={bill.status} />
                   </div>
-                ))}
-
-                {upcomingBills.length === 0 && (
-                  <p className="rounded-lg bg-budget-background p-4 text-sm font-semibold text-budget-text/55">
-                    No unpaid bills right now.
-                  </p>
                 )}
               </div>
-            </PreviewPanel>
+            </div>
+          </article>
 
-            <PreviewPanel title="Goal preview" to="/goals">
-              <div className="grid gap-4">
-                {previewGoals.map((goal) => {
-                  const progress = getGoalProgress(goal);
-                  const targetDate = goal.target_date ? format(parseISO(goal.target_date), "MMM d") : "";
+        <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
+  <DashboardStatCard
+    helper={incomeTrend.label}
+    icon={CircleDollarSign}
+    title="Income"
+    tone="green"
+    trend={incomeTrend}
+    trendPoints={incomeSparklinePoints}
+    value={formatCurrency(statSummary.income)}
+  />
 
-                  return (
-                    <div key={goal.id}>
-                      <div className="mb-2 flex items-center justify-between gap-2">
-                        <div className="flex min-w-0 items-center gap-2">
-                          <span aria-hidden="true" className="text-lg">
-                            {getGoalIcon(goal)}
-                          </span>
-                          <p className="truncate text-sm font-black">{goal.title}</p>
-                        </div>
-                        <Badge tone="cat">{progress}%</Badge>
-                      </div>
-                      <Progress value={progress} />
-                      <p className="mt-2 text-xs font-semibold text-budget-text/55">
-                        {formatCurrency(goal.current_amount)} / {formatCurrency(goal.target_amount)}
-                        {targetDate ? ` - ${targetDate}` : ""}
-                      </p>
-                    </div>
-                  );
-                })}
+  <DashboardStatCard
+    helper={expenseTrend.label}
+    icon={ReceiptText}
+    title="Expenses"
+    tone="red"
+    trend={expenseTrend}
+    trendPoints={expenseSparklinePoints}
+    value={formatCurrency(statSummary.expenses)}
+  />
 
-                {previewGoals.length === 0 && (
-                  <p className="rounded-lg bg-budget-background p-4 text-sm font-semibold text-budget-text/55">
-                    No active goals yet.
-                  </p>
-                )}
+  <DashboardStatCard
+    helper={`${statBills.length} bill${
+      statBills.length === 1 ? "" : "s"
+    } ${isYearlyView ? "this year" : "this month"}`}
+    icon={CreditCard}
+    title="Bills"
+    tone="amber"
+    trend={billsTrend}
+    trendPoints={billsSparklinePoints}
+    value={formatCurrency(statBillsTotal)}
+  />
+
+  <DashboardStatCard
+    helper={savingsTrend.label}
+    icon={PiggyBank}
+    title="Savings"
+    tone="blue"
+    trend={savingsTrend}
+    trendPoints={savingsSparklinePoints}
+    value={formatCurrency(statSummary.savings)}
+  />
+</section>
+
+          <article className="bc-card p-4">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-xs font-black text-[var(--bc-text-soft)]">
+                  Remaining
+                </p>
+                <p className="mt-1 text-3xl font-black tracking-[-0.06em] text-[var(--bc-blue)]">
+                  {formatCurrency(summary.remaining)}
+                </p>
               </div>
-            </PreviewPanel>
-          </div>
-        </section>
 
-        <section className="mt-6">
-          <PreviewPanel title="Recent transactions" to="/transactions">
-            <div className="grid gap-3">
-              {recentTransactions.map((transaction) => {
-                const isPositive = transaction.type === "income" || transaction.type === "salary";
-                const transactionTypeLabel = transaction.type.replace("_", " ");
+              <span className="rounded-full bg-[var(--bc-blue)]/10 px-3 py-1 text-xs font-black text-[var(--bc-blue)]">
+                {remainingPercent}% left
+              </span>
+            </div>
 
-                return (
-                  <div
-                    className="flex min-w-0 items-center justify-between gap-3 rounded-lg border border-budget-border bg-budget-card p-3"
-                    key={transaction.id}
-                  >
-                    <div className="min-w-0">
-                      <p className="flex min-w-0 items-center gap-2 font-black">
-                        <span aria-hidden="true" className="shrink-0 text-lg">
-                          {getDashboardTransactionIcon(transaction)}
-                        </span>
-                        <span className="truncate">{getCategoryLabel(transaction.category)}</span>
-                      </p>
-                      <p className="text-xs font-semibold capitalize text-budget-text/55">
-                        {transactionTypeLabel} - {format(parseISO(transaction.date), "MMM d")}
-                      </p>
-                    </div>
+            <div className="mt-4">
+              <div className="mb-2 flex items-center justify-between text-[11px] font-bold text-[var(--bc-text-muted)]">
+                <span>Income left</span>
+                <span>{remainingPercent}%</span>
+              </div>
+              <div className="bc-progress-track">
+                <div
+                  className={cn(
+                    "bc-progress-fill",
+                    remainingPercent < 20 && "bc-progress-fill-danger",
+                    remainingPercent >= 20 &&
+                      remainingPercent < 40 &&
+                      "bc-progress-fill-warning",
+                  )}
+                  style={{ width: `${remainingPercent}%` }}
+                />
+              </div>
+            </div>
+          </article>
+        </div>
 
-                    <p
-                      className={
-                        isPositive
-                          ? "shrink-0 font-black text-budget-success"
-                          : "shrink-0 font-black text-budget-urgent"
-                      }
-                    >
-                      {isPositive ? "+" : "-"}
-                      {formatCurrency(transaction.amount)}
+        <div className="space-y-4">
+          <article className="relative overflow-visible px-3 py-2">
+            <div className="relative grid grid-cols-[128px_1fr] items-center gap-3 overflow-visible">
+              <div className="relative min-h-[112px] overflow-visible">
+                <BudgetCatMascot
+                  className="absolute inset-0 flex h-full w-full items-center justify-center"
+                  imageClassName="h-full w-full scale-[2.15] object-contain object-center"
+                  variant="both"
+                />
+              </div>
+
+              <div className="min-w-0">
+                <p className="text-sm font-black leading-snug text-[var(--bc-text)]">
+                  Keep it up, {nickname}!
+                </p>
+
+                <p className="mt-2 text-xs font-semibold leading-relaxed text-[var(--bc-text-muted)]">
+                  {cleanMascotMessage}
+
+                  {pendingSyncCount > 0 ? (
+                    <span className="ml-1.5 inline-flex align-[-2px] text-[var(--bc-blue)]">
+                      <RefreshCw
+                        aria-label="Sync in progress"
+                        className="h-3.5 w-3.5 animate-spin"
+                        strokeWidth={2.6}
+                      />
+                    </span>
+                  ) : (
+                    <span className="ml-1.5 inline-flex align-[-2px] text-[var(--bc-green)]">
+                      <ShieldCheck
+                        aria-label="All synced"
+                        className="h-3.5 w-3.5"
+                        strokeWidth={2.6}
+                      />
+                    </span>
+                  )}
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-4 rounded-[22px] border border-[var(--bc-border)] bg-[var(--bc-card)] p-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs font-black text-[var(--bc-text-muted)]">
+                    This Month Summary
+                  </p>
+                  <p className="mt-2 text-3xl font-black tracking-[-0.06em] text-[var(--bc-text)]">
+                    {formatCurrency(summary.remaining)}
+                  </p>
+                  <p className="mt-1 text-xs font-semibold text-[var(--bc-text-muted)]">
+                    Remaining • {remainingPercent}% of income left
+                  </p>
+                </div>
+
+                <span className="rounded-2xl border border-[var(--bc-border)] bg-[var(--bc-green-glow)] px-3 py-2 text-xs font-black text-[var(--bc-green)]">
+                  {monthLabel}
+                </span>
+              </div>
+
+              <div className="mt-4 bc-progress-track">
+                <div
+                  className="bc-progress-fill"
+                  style={{ width: `${remainingPercent}%` }}
+                />
+              </div>
+            </div>
+
+            <div className="mt-3 grid grid-cols-2 gap-3">
+              <div className="rounded-[20px] border border-[var(--bc-red)]/15 bg-[var(--bc-red-glow)] p-3">
+                <p className="text-xs font-black text-[var(--bc-text-muted)]">
+                  You’ve spent
+                </p>
+                <p className="mt-2 text-2xl font-black tracking-[-0.05em] text-[var(--bc-red)]">
+                  {spendingPercent}%
+                </p>
+                <p className="mt-1 text-[11px] font-semibold text-[var(--bc-text-muted)]">
+                  of your income
+                </p>
+              </div>
+
+              <div className="rounded-[20px] border border-[var(--bc-green)]/15 bg-[var(--bc-green-glow)] p-3">
+                <p className="text-xs font-black text-[var(--bc-text-muted)]">
+                  You can spend
+                </p>
+                <p className="mt-2 text-2xl font-black tracking-[-0.05em] text-[var(--bc-green)]">
+                  {formatCurrency(safeToSpend)}
+                </p>
+                <p className="mt-1 text-[11px] font-semibold text-[var(--bc-text-muted)]">
+                  more this month
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-4">
+              <p className="mb-3 text-sm font-black text-[var(--bc-text)]">
+                Quick Actions
+              </p>
+
+              <div className="grid grid-cols-4 gap-2">
+               <AddTransactionDialog
+  ariaLabel="Add transaction"
+  className="group flex min-h-[74px] flex-col items-center justify-center gap-2 rounded-[18px] border border-[var(--bc-border)] bg-[var(--bc-card)] px-2 text-center text-[11px] font-black text-[var(--bc-text-soft)] transition hover:border-[var(--bc-green)]/35 hover:bg-[var(--bc-green-glow)] [&>svg]:h-8 [&>svg]:w-8 [&>svg]:rounded-full [&>svg]:border [&>svg]:border-[var(--bc-green)]/25 [&>svg]:bg-[var(--bc-green-glow)] [&>svg]:p-2 [&>svg]:text-[var(--bc-green)]"
+  compact
+  label="Add"
+/>
+
+                <Link
+                  className="flex min-h-[74px] flex-col items-center justify-center gap-2 rounded-[18px] border border-[var(--bc-border)] bg-[var(--bc-card)] px-2 text-center text-[11px] font-black text-[var(--bc-text-soft)]"
+                  to="/transactions"
+                >
+                  <span className="bc-icon-circle-green flex h-8 w-8 items-center justify-center rounded-full">
+                    <ListChecks className="h-4 w-4" />
+                  </span>
+                  Ledger
+                </Link>
+
+                <Link
+                  className="flex min-h-[74px] flex-col items-center justify-center gap-2 rounded-[18px] border border-[var(--bc-border)] bg-[var(--bc-card)] px-2 text-center text-[11px] font-black text-[var(--bc-text-soft)]"
+                  to="/due-dates"
+                >
+                  <span className="bc-icon-circle-amber flex h-8 w-8 items-center justify-center rounded-full">
+                    <CreditCard className="h-4 w-4" />
+                  </span>
+                  Bills
+                </Link>
+
+                <Link
+                  className="flex min-h-[74px] flex-col items-center justify-center gap-2 rounded-[18px] border border-[var(--bc-border)] bg-[var(--bc-card)] px-2 text-center text-[11px] font-black text-[var(--bc-text-soft)]"
+                  to="/goals"
+                >
+                  <span className="bc-icon-circle-blue flex h-8 w-8 items-center justify-center rounded-full">
+                    <Target className="h-4 w-4" />
+                  </span>
+                  Goals
+                </Link>
+              </div>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section className="mt-4 grid gap-4 xl:grid-cols-[1fr_1fr]">
+        <article className="bc-card p-4">
+          <SectionHeader
+            actionLabel="View all"
+            title="Recent transactions"
+            to="/transactions"
+          />
+
+          <div className="space-y-3">
+            {recentTransactions.map((transaction) => {
+              const isIncome = isIncomeTransaction(transaction);
+              const isSavings = isSavingsTransaction(transaction);
+              const amountPrefix = isIncome ? "+" : "-";
+
+              return (
+                <div
+                  className="flex items-center gap-3 rounded-[18px] border border-[var(--bc-border)] bg-[var(--bc-surface-soft)]/55 p-3"
+                  key={transaction.id}
+                >
+                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[var(--bc-card)] text-xl">
+                    {getDashboardTransactionIcon(transaction)}
+                  </div>
+
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-black text-[var(--bc-text)]">
+                      {getCategoryLabel(transaction.category)}
+                    </p>
+                    <p className="mt-0.5 truncate text-[11px] font-semibold text-[var(--bc-text-muted)]">
+                      {getTypeLabel(transaction.type)} •{" "}
+                      {formatDate(transaction.date, "MMM d")}
                     </p>
                   </div>
-                );
-              })}
 
-              {recentTransactions.length === 0 && (
-                <p className="rounded-lg bg-budget-background p-4 text-sm font-semibold text-budget-text/55">
-                  No transactions yet.
-                </p>
-              )}
-            </div>
-          </PreviewPanel>
-        </section>
-
-        <section className="mt-6">
-          <PreviewPanel title="Reports preview" to="/reports">
-            <div className="grid gap-3 sm:grid-cols-3">
-              <div className="rounded-lg bg-budget-background p-4">
-                <div className="mb-2 flex items-center gap-2 text-budget-primary">
-                  <BarChart3 size={17} />
-                  <p className="text-xs font-black uppercase tracking-wide">Income</p>
+                  <p
+                    className={cn(
+                      "shrink-0 text-sm font-black",
+                      isIncome && "text-[var(--bc-green)]",
+                      isSavings && "text-[var(--bc-blue)]",
+                      !isIncome && !isSavings && "text-[var(--bc-red)]",
+                    )}
+                  >
+                    {amountPrefix}
+                    {formatCurrency(transaction.amount)}
+                  </p>
                 </div>
-                <p className="font-display text-xl font-black text-budget-cat">
-                  {formatCurrency(summary.income)}
-                </p>
+              );
+            })}
+
+            {recentTransactions.length === 0 && (
+              <EmptyState>No transactions yet.</EmptyState>
+            )}
+          </div>
+        </article>
+
+        <article className="bc-card p-4">
+          <SectionHeader
+            actionLabel="View all"
+            title="Upcoming bills"
+            to="/due-dates"
+          />
+
+          <div className="space-y-3">
+            {upcomingBills.map((bill) => (
+              <div
+                className="flex items-center gap-3 rounded-[18px] border border-[var(--bc-border)] bg-[var(--bc-surface-soft)]/55 p-3"
+                key={bill.id}
+              >
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[var(--bc-card)] text-xl">
+                  {getDueDateIcon(bill) || "🧾"}
+                </div>
+
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-black text-[var(--bc-text)]">
+                    {bill.title}
+                  </p>
+                  <p className="mt-0.5 truncate text-[11px] font-semibold text-[var(--bc-text-muted)]">
+                    {formatDate(bill.due_date, "MMM d")} •{" "}
+                    {bill.repeat_type === "none"
+                      ? "One-time"
+                      : `Repeats ${bill.repeat_type}`}
+                  </p>
+                </div>
+
+                <div className="shrink-0 text-right">
+                  <p className="text-[11px] font-bold text-[var(--bc-text-muted)]">
+                    {getBillDaysLeftLabel(bill)}
+                  </p>
+                  <p className="mt-1 text-sm font-black text-[var(--bc-red)]">
+                    {formatCurrency(bill.amount)}
+                  </p>
+                </div>
+              </div>
+            ))}
+
+            {upcomingBills.length === 0 && (
+              <EmptyState>No unpaid bills right now.</EmptyState>
+            )}
+          </div>
+        </article>
+      </section>
+
+      <section className="mt-4 grid gap-4 xl:grid-cols-[1fr_1fr]">
+        <article className="bc-card p-4">
+          <SectionHeader actionLabel="View all" title="Goals" to="/goals" />
+
+          {featuredGoal ? (
+            <div className="mb-3 rounded-[22px] border border-[var(--bc-border)] bg-[var(--bc-green-glow)] p-4">
+              <div className="flex items-start gap-3">
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[var(--bc-card)] text-2xl">
+                  {getGoalIcon(featuredGoal) || "🌱"}
+                </div>
+
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-base font-black text-[var(--bc-text)]">
+                    {featuredGoal.title}
+                  </p>
+                  <p className="mt-1 text-sm font-black text-[var(--bc-green)]">
+                    {formatCurrency(featuredGoal.current_amount)} /{" "}
+                    {formatCurrency(featuredGoal.target_amount)}
+                  </p>
+
+                  <div className="mt-3 bc-progress-track">
+                    <div
+                      className="bc-progress-fill"
+                      style={{ width: `${getGoalProgress(featuredGoal)}%` }}
+                    />
+                  </div>
+
+                  <div className="mt-2 flex items-center justify-between text-[11px] font-bold text-[var(--bc-text-muted)]">
+                    <span>{getGoalProgress(featuredGoal)}% complete</span>
+                    <span>{getGoalMonthsLeft(featuredGoal)} months left</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          <div className="space-y-3">
+            {previewGoals.map((goal) => {
+              const progress = getGoalProgress(goal);
+
+              return (
+                <div
+                  className="rounded-[18px] border border-[var(--bc-border)] bg-[var(--bc-surface-soft)]/55 p-3"
+                  key={goal.id}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[var(--bc-card)] text-xl">
+                      {getGoalIcon(goal) || "🌱"}
+                    </div>
+
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-black text-[var(--bc-text)]">
+                            {goal.title}
+                          </p>
+                          <p className="mt-0.5 truncate text-[11px] font-semibold text-[var(--bc-text-muted)]">
+                            Target:{" "}
+                            {formatDate(goal.target_date, "MMM d, yyyy")}
+                          </p>
+                        </div>
+
+                        <p className="shrink-0 text-xs font-black text-[var(--bc-green)]">
+                          {progress}%
+                        </p>
+                      </div>
+
+                      <div className="mt-3 bc-progress-track">
+                        <div
+                          className="bc-progress-fill"
+                          style={{ width: `${progress}%` }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+
+            {previewGoals.length === 0 && (
+              <EmptyState>No active goals yet.</EmptyState>
+            )}
+          </div>
+        </article>
+
+        <article className="bc-card p-4">
+          <SectionHeader title="Budget health" />
+
+          <div className="rounded-[22px] border border-[var(--bc-border)] bg-[var(--bc-surface-soft)]/55 p-4">
+            <div className="flex items-start gap-3">
+              <div className="bc-icon-circle-green">
+                <Landmark className="h-4.5 w-4.5" />
               </div>
 
-              <div className="rounded-lg bg-budget-background p-4">
-                <p className="text-xs font-black uppercase tracking-wide text-budget-text/45">
-                  Expenses
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-black text-[var(--bc-text)]">
+                  Monthly spending
                 </p>
-                <p className="mt-2 font-display text-xl font-black text-budget-urgent">
-                  {formatCurrency(summary.expenses)}
-                </p>
-              </div>
-
-              <div className="rounded-lg bg-budget-background p-4">
-                <p className="text-xs font-black uppercase tracking-wide text-budget-text/45">
-                  Savings
-                </p>
-                <p className="mt-2 font-display text-xl font-black text-budget-success">
-                  {formatCurrency(summary.savings)}
+                <p className="mt-1 text-xs leading-relaxed text-[var(--bc-text-muted)]">
+                  You have spent {spendingPercent}% of your income this month.
                 </p>
               </div>
             </div>
-          </PreviewPanel>
-        </section>
+
+            <div className="mt-4 bc-progress-track">
+              <div
+                className={cn(
+                  "bc-progress-fill",
+                  spendingPercent >= 80 && "bc-progress-fill-danger",
+                  spendingPercent >= 60 &&
+                    spendingPercent < 80 &&
+                    "bc-progress-fill-warning",
+                )}
+                style={{ width: `${spendingPercent}%` }}
+              />
+            </div>
+          </div>
+
+          <div className="mt-4 space-y-3">
+            {reminders.slice(0, 3).map((reminder) => (
+              <div
+                className={cn(
+                  "flex items-start gap-3 rounded-[18px] border p-3",
+                  getReminderToneClass(reminder),
+                )}
+                key={reminder.id}
+              >
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--bc-card)] text-lg">
+                  {reminder.icon || "🔔"}
+                </div>
+
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-black text-[var(--bc-text)]">
+                    {reminder.title}
+                  </p>
+                  <p className="mt-0.5 text-[11px] font-semibold leading-relaxed text-[var(--bc-text-muted)]">
+                    {reminder.body}
+                  </p>
+                </div>
+              </div>
+            ))}
+
+            {reminders.length === 0 && (
+              <div className="flex items-center gap-3 rounded-[18px] border border-[var(--bc-green)]/20 bg-[var(--bc-green-glow)] p-3">
+                <div className="bc-icon-circle-green">
+                  <Home className="h-4.5 w-4.5" />
+                </div>
+                <div>
+                  <p className="text-sm font-black text-[var(--bc-text)]">
+                    No urgent reminders
+                  </p>
+                  <p className="mt-0.5 text-[11px] font-semibold text-[var(--bc-text-muted)]">
+                    Bonnie and Clyde say your dashboard looks calm today.
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <Link
+            className="mt-4 flex min-h-12 items-center justify-center gap-2 rounded-[18px] border border-[var(--bc-border)] bg-[var(--bc-card)] text-sm font-black text-[var(--bc-text-soft)]"
+            to="/reports"
+          >
+            <Wallet className="h-4.5 w-4.5 text-[var(--bc-green)]" />
+            Open Reports
+          </Link>
+        </article>
+      </section>
+
+      <div className="mt-3 md:hidden">
+        <Link
+          className="flex min-h-11 items-center justify-center gap-2 rounded-[18px] border border-[var(--bc-border)] bg-[var(--bc-card)] text-sm font-black text-[var(--bc-text-soft)]"
+          to="/settings"
+        >
+          <Settings className="h-4.5 w-4.5 text-[var(--bc-green)]" />
+          Settings
+        </Link>
       </div>
-    </>
+    </div>
   );
 }

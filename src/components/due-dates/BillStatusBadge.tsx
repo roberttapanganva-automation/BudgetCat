@@ -7,7 +7,7 @@ export function BillStatusBadge({ status }: { status: string }) {
   if (normalized === "paid") {
     return (
       <Badge className="gap-1.5" tone="success">
-        <AnimatedStatusIcon className="h-[13px] w-[13px] text-budget-success" icon={CheckCircle2} />
+        <AnimatedStatusIcon className="h-[13px] w-[13px] text-[var(--bc-green)]" icon={CheckCircle2} />
         Paid
       </Badge>
     );
@@ -17,7 +17,7 @@ export function BillStatusBadge({ status }: { status: string }) {
       <Badge className="gap-1.5" tone="urgent">
         <AnimatedStatusIcon
           animation="pulse"
-          className="h-[13px] w-[13px] text-budget-urgent"
+          className="h-[13px] w-[13px] text-[var(--bc-red)]"
           icon={AlertTriangle}
           label="Overdue"
         />
@@ -30,7 +30,7 @@ export function BillStatusBadge({ status }: { status: string }) {
       <Badge className="gap-1.5" tone="warning">
         <AnimatedStatusIcon
           animation="pulse"
-          className="h-[13px] w-[13px] text-budget-warning"
+          className="h-[13px] w-[13px] text-[var(--bc-amber)]"
           icon={CalendarClock}
           label="Due soon"
         />
@@ -42,7 +42,7 @@ export function BillStatusBadge({ status }: { status: string }) {
     return (
       <Badge className="gap-1.5" tone="warning">
         <AnimatedStatusIcon
-          className="h-[13px] w-[13px] text-budget-warning"
+          className="h-[13px] w-[13px] text-[var(--bc-amber)]"
           icon={CalendarDays}
         />
         Upcoming

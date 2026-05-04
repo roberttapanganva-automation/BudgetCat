@@ -1,55 +1,63 @@
-import { BarChart3, CalendarDays, Home, Plus, WalletCards } from "lucide-react";
+import { BarChart3, CalendarDays, Home, WalletCards } from "lucide-react";
 import { NavLink } from "react-router-dom";
+
 import { cn } from "../../lib/utils";
 import { AddTransactionDialog } from "../transactions/AddTransactionDialog";
 
 const items = [
-  { label: "Home", href: "/", icon: Home },
+  { label: "Dashboard", href: "/", icon: Home },
   { label: "Ledger", href: "/transactions", icon: WalletCards },
-  { label: "Add", href: "/transactions", icon: Plus, isPrimary: true },
+  { label: "Add", href: "/transactions", isPrimary: true },
   { label: "Reports", href: "/reports", icon: BarChart3 },
   { label: "Bills", href: "/due-dates", icon: CalendarDays },
 ];
 
 export function MobileNav() {
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-budget-border bg-budget-background px-2 pt-2 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] md:hidden">
-      <div className="mx-auto grid max-w-lg grid-cols-5 items-end">
-        {items.map((item) => (
-          item.isPrimary ? (
-            <div className="flex items-end justify-center" key={item.href}>
-              <AddTransactionDialog
-                ariaLabel="Add transaction"
-                className="h-14 w-14 -translate-y-4 rounded-full bg-budget-primary p-0 text-white hover:bg-budget-primary"
-                compact
-                label={item.label}
-              />
-            </div>
-          ) : (
-          <NavLink
-            className={({ isActive }) =>
-              cn(
-                "flex min-w-0 flex-col items-center justify-end gap-1 rounded-lg px-1 py-1.5 text-[10px] font-black uppercase leading-none tracking-normal text-budget-text/50 transition",
-                isActive
-                  ? "bg-budget-primary/10 text-budget-primary"
-                  : "hover:text-budget-text",
-              )
-            }
-            end={item.href === "/"}
-            key={item.href}
-            to={item.href}
-          >
-            <span
-              className={cn(
-                "grid h-9 w-9 place-items-center rounded-lg",
-              )}
+    <nav className="bc-bottom-nav md:hidden" aria-label="Main mobile navigation">
+      <div className="bc-safe-bottom grid grid-cols-5 items-end gap-1 px-3 pt-2">
+        {items.map((item) => {
+          if (item.isPrimary) {
+            return (
+             <div key={item.label} className="relative flex items-center justify-center">
+  <div className="absolute left-1/2 top-[-18px] -translate-x-1/2">
+    <AddTransactionDialog
+      ariaLabel="Quick add transaction"
+      className="flex h-14 w-14 items-center justify-center rounded-[22px] border border-[var(--bc-green)]/30 bg-[linear-gradient(180deg,color-mix(in_srgb,var(--bc-green)_88%,white_12%),var(--bc-green-soft))] p-0 text-white shadow-[0_16px_34px_var(--bc-green-glow)]"
+      compact
+      label=""
+    />
+  </div>
+  <span className="pointer-events-none mt-9 text-[10px] font-black text-[var(--bc-text-muted)]">
+    Add
+  </span>
+</div>
+            );
+          }
+
+          const Icon = item.icon;
+
+          return (
+            <NavLink
+              className={({ isActive }) =>
+                cn(
+                  "bc-bottom-nav-item flex min-w-0 flex-col items-center justify-center gap-1 rounded-2xl px-1 py-2 transition",
+                  isActive
+                    ? "bc-bottom-nav-item-active bg-[var(--bc-green-glow)]"
+                    : "hover:text-[var(--bc-text-soft)]",
+                )
+              }
+              end={item.href === "/"}
+              key={item.label}
+              to={item.href}
             >
-              <item.icon size={19} />
-            </span>
-            <span className="truncate">{item.label}</span>
-          </NavLink>
-          )
-        ))}
+              {Icon ? <Icon className="h-5 w-5" strokeWidth={2.4} /> : null}
+              <span className="truncate text-[10px] leading-none">
+                {item.label}
+              </span>
+            </NavLink>
+          );
+        })}
       </div>
     </nav>
   );
