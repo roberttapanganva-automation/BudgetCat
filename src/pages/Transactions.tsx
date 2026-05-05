@@ -804,7 +804,7 @@ export function Transactions() {
 
   return (
     <>
-<section className="space-y-6 px-5 pt-6 pb-28 md:px-0 md:pt-0 md:pb-0">        
+<section className="flex flex-col gap-4 px-5 pb-20 pt-5 md:min-h-0 md:px-0 md:pb-0 md:pt-0"> 
 <header className="flex items-start justify-between gap-4 pt-1">          
   <div>
             <p className="text-[11px] font-black uppercase tracking-[0.28em] text-[var(--bc-text-muted)]">
@@ -877,7 +877,7 @@ export function Transactions() {
           </div>
         </section>
 
-<section className="bc-card relative z-20 mb-5 overflow-visible rounded-[28px] p-4">
+<section className="bc-card relative z-20 overflow-visible rounded-[28px] p-4">
             <div className="relative">
             <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--bc-text-muted)]" />
 
@@ -902,7 +902,12 @@ export function Transactions() {
           </div>
         </section>
 
-        <section className="space-y-5">
+        <section
+  className={cn(
+    "space-y-3",
+    filteredTransactions.length === 0 && "flex flex-col",
+  )}
+>
           {groupedTransactions.map((group) => (
             <div className="space-y-2" key={group.key}>
 <div className="px-1 pt-1">
@@ -928,12 +933,12 @@ export function Transactions() {
           ))}
 
           {filteredTransactions.length === 0 && (
-            <div className="bc-card-elevated flex flex-col items-center justify-center px-6 py-12 text-center">
+<div className="bc-card-elevated flex flex-col items-center justify-center px-6 py-8 text-center">
               <div className="flex h-14 w-14 items-center justify-center rounded-full border border-[var(--bc-border)] bg-[var(--bc-surface-soft)] text-[var(--bc-green)]">
                 <WalletCards className="h-6 w-6" />
               </div>
 
-              <h2 className="mt-4 text-lg font-black text-[var(--bc-text)]">
+              <h2 className="mt-3 text-lg font-black text-[var(--bc-text)]">
                 No transactions found
               </h2>
 

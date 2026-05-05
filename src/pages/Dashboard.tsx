@@ -25,7 +25,7 @@ import {
   parseISO,
   subMonths,
 } from "date-fns";
-import { type ReactNode, useEffect, useMemo, useState } from "react";
+import { type CSSProperties, type ReactNode, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { ThemeToggle } from "../components/layout/ThemeToggle";
@@ -535,9 +535,11 @@ function getYearlyBillSparklinePoints(
 function DashboardStatSparkline({
   points,
   tone,
+  introDelayMs = 0,
 }: {
   points: DashboardSparklinePoint[];
   tone: StatTone;
+  introDelayMs?: number;
 }) {
   const toneClass = statToneClasses[tone];
 
@@ -597,15 +599,27 @@ function DashboardStatSparkline({
           aria-label="Selected period activity graph"
           className="h-[54px] w-full overflow-visible"
           preserveAspectRatio="none"
+          style={
+            {
+              "--bc-sparkline-delay": `${introDelayMs}ms`,
+            } as CSSProperties
+          }
           viewBox={`0 0 ${chartWidth} ${chartHeight}`}
         >
           {areaPoints ? (
-            <polygon fill="currentColor" opacity="0.08" points={areaPoints} />
+            <polygon
+              className="bc-sparkline-fill-reveal"
+              fill="currentColor"
+              opacity="0.08"
+              points={areaPoints}
+            />
           ) : null}
 
           <polyline
+            className="bc-sparkline-line-draw"
             fill="none"
             opacity={maxValue <= 0 ? "0.45" : "1"}
+            pathLength={100}
             points={linePoints}
             stroke="currentColor"
             strokeLinecap="round"
@@ -614,7 +628,9 @@ function DashboardStatSparkline({
           />
 
           <line
+            className="bc-sparkline-axis-reveal"
             opacity="0.16"
+            pathLength={100}
             stroke="currentColor"
             strokeLinecap="round"
             strokeWidth="1"
@@ -636,6 +652,7 @@ function DashboardStatCard({
   tone,
   trend,
   trendPoints,
+  sparklineDelayMs = 0,
 }: {
   title: string;
   value: string;
@@ -647,6 +664,7 @@ function DashboardStatCard({
     positive: boolean;
   };
   trendPoints: DashboardSparklinePoint[];
+  sparklineDelayMs?: number;
 }) {
   const toneClass = statToneClasses[tone];
 
@@ -696,7 +714,11 @@ function DashboardStatCard({
           </p>
         </div>
 
-        <DashboardStatSparkline points={trendPoints} tone={tone} />
+        <DashboardStatSparkline
+          introDelayMs={sparklineDelayMs}
+          points={trendPoints}
+          tone={tone}
+        />
       </div>
     </article>
   );
@@ -976,7 +998,10 @@ const billsSparklinePoints = isYearlyView
             {monthLabel}
           </p>
           <h1 className="mt-1 truncate text-xl font-black tracking-[-0.04em] text-[var(--bc-text)] md:text-3xl">
-            {greeting}, {nickname}! 👋
+            {greeting}, {nickname}!{" "}
+            <span aria-hidden="true" className="bc-wave-emoji">
+              {"\u{1F44B}"}
+            </span>
           </h1>
         </div>
 
@@ -986,13 +1011,16 @@ const billsSparklinePoints = isYearlyView
           <button
             aria-expanded={showNotifications}
             aria-label="Notifications"
-            className="relative flex h-10 w-10 items-center justify-center rounded-2xl border border-[var(--bc-border)] bg-[var(--bc-card)] text-[var(--bc-text)]"
+            className={cn(
+              "relative flex h-10 w-10 items-center justify-center rounded-2xl border border-[var(--bc-border)] bg-[var(--bc-card)] text-[var(--bc-text)]",
+              (showNotifications || reminders.length > 0) && "bc-bell-active",
+            )}
             onClick={() => setShowNotifications((current) => !current)}
             type="button"
           >
             <Bell className="h-4.5 w-4.5" strokeWidth={2.4} />
             {reminders.length > 0 && (
-              <span className="absolute right-2 top-2 h-2.5 w-2.5 rounded-full border-2 border-[var(--bc-card)] bg-[var(--bc-red)]" />
+              <span className="bc-notification-dot-pulse absolute right-2 top-2 h-2.5 w-2.5 rounded-full border-2 border-[var(--bc-card)] bg-[var(--bc-red)]" />
             )}
           </button>
 
@@ -1007,59 +1035,123 @@ const billsSparklinePoints = isYearlyView
       </header>
 
       {showNotifications && (
-        <section className="bc-card mb-4 p-4">
-          <div className="mb-3 flex items-center justify-between gap-3">
-            <div>
-              <h2 className="text-base font-black text-[var(--bc-text)]">
-                Notifications
-              </h2>
-              <p className="mt-1 text-xs font-semibold text-[var(--bc-text-muted)]">
-                Bills, goals, and sync reminders from your real BudgetCat data.
-              </p>
+        <>
+          <div
+            className="fixed inset-0 z-[70] bg-black/40 px-3 pt-20 backdrop-blur-sm md:hidden"
+            onClick={() => setShowNotifications(false)}
+          >
+            <section
+              className="bc-card mx-auto w-full max-w-[430px] p-4"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <div>
+                  <h2 className="text-base font-black text-[var(--bc-text)]">
+                    Notifications
+                  </h2>
+                  <p className="mt-1 text-xs font-semibold text-[var(--bc-text-muted)]">
+                    Bills, goals, and sync reminders from your real BudgetCat data.
+                  </p>
+                </div>
+
+                <button
+                  className="rounded-full border border-[var(--bc-red)]/30 bg-[var(--bc-red-glow)] px-3 py-1 text-xs font-black text-[var(--bc-red)] hover:bg-[var(--bc-red)] hover:text-white"
+                  onClick={() => setShowNotifications(false)}
+                  type="button"
+                >
+                  Close
+                </button>
+              </div>
+
+              <div className="space-y-2">
+                {reminders.slice(0, 4).map((reminder) => (
+                  <div
+                    className="flex items-start gap-3 rounded-[18px] border border-[var(--bc-border)] bg-[var(--bc-surface-soft)]/60 p-3"
+                    key={reminder.id}
+                  >
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[var(--bc-border)] bg-[var(--bc-card)] text-lg">
+                      {reminder.icon || "🔔"}
+                    </div>
+
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-black text-[var(--bc-text)]">
+                        {reminder.title}
+                      </p>
+                      <p className="mt-1 text-xs font-semibold leading-relaxed text-[var(--bc-text-muted)]">
+                        {reminder.body}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+
+                {reminders.length === 0 && (
+                  <div className="rounded-[18px] border border-[var(--bc-green)]/20 bg-[var(--bc-green-glow)] p-4 text-center">
+                    <p className="text-sm font-black text-[var(--bc-text)]">
+                      No notifications right now
+                    </p>
+                    <p className="mt-1 text-xs font-semibold text-[var(--bc-text-muted)]">
+                      Bonnie and Clyde say everything looks calm.
+                    </p>
+                  </div>
+                )}
+              </div>
+            </section>
+          </div>
+
+          <section className="bc-card mb-4 hidden p-4 md:block">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <div>
+                <h2 className="text-base font-black text-[var(--bc-text)]">
+                  Notifications
+                </h2>
+                <p className="mt-1 text-xs font-semibold text-[var(--bc-text-muted)]">
+                  Bills, goals, and sync reminders from your real BudgetCat data.
+                </p>
+              </div>
+
+              <button
+                className="rounded-full border border-[var(--bc-red)]/30 bg-[var(--bc-red-glow)] px-3 py-1 text-xs font-black text-[var(--bc-red)] hover:bg-[var(--bc-red)] hover:text-white"
+                onClick={() => setShowNotifications(false)}
+                type="button"
+              >
+                Close
+              </button>
             </div>
 
-            <button
-              className="rounded-full border border-[var(--bc-border)] bg-[var(--bc-surface-soft)] px-3 py-1 text-xs font-black text-[var(--bc-text-muted)]"
-              onClick={() => setShowNotifications(false)}
-              type="button"
-            >
-              Close
-            </button>
-          </div>
+            <div className="space-y-2">
+              {reminders.slice(0, 4).map((reminder) => (
+                <div
+                  className="flex items-start gap-3 rounded-[18px] border border-[var(--bc-border)] bg-[var(--bc-surface-soft)]/60 p-3"
+                  key={reminder.id}
+                >
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[var(--bc-border)] bg-[var(--bc-card)] text-lg">
+                    {reminder.icon || "🔔"}
+                  </div>
 
-          <div className="space-y-2">
-            {reminders.slice(0, 4).map((reminder) => (
-              <div
-                className="flex items-start gap-3 rounded-[18px] border border-[var(--bc-border)] bg-[var(--bc-surface-soft)]/60 p-3"
-                key={reminder.id}
-              >
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[var(--bc-border)] bg-[var(--bc-card)] text-lg">
-                  {reminder.icon || "🔔"}
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-black text-[var(--bc-text)]">
+                      {reminder.title}
+                    </p>
+                    <p className="mt-1 text-xs font-semibold leading-relaxed text-[var(--bc-text-muted)]">
+                      {reminder.body}
+                    </p>
+                  </div>
                 </div>
+              ))}
 
-                <div className="min-w-0 flex-1">
+              {reminders.length === 0 && (
+                <div className="rounded-[18px] border border-[var(--bc-green)]/20 bg-[var(--bc-green-glow)] p-4 text-center">
                   <p className="text-sm font-black text-[var(--bc-text)]">
-                    {reminder.title}
+                    No notifications right now
                   </p>
-                  <p className="mt-1 text-xs font-semibold leading-relaxed text-[var(--bc-text-muted)]">
-                    {reminder.body}
+                  <p className="mt-1 text-xs font-semibold text-[var(--bc-text-muted)]">
+                    Bonnie and Clyde say everything looks calm.
                   </p>
                 </div>
-              </div>
-            ))}
-
-            {reminders.length === 0 && (
-              <div className="rounded-[18px] border border-[var(--bc-green)]/20 bg-[var(--bc-green-glow)] p-4 text-center">
-                <p className="text-sm font-black text-[var(--bc-text)]">
-                  No notifications right now
-                </p>
-                <p className="mt-1 text-xs font-semibold text-[var(--bc-text-muted)]">
-                  Bonnie and Clyde say everything looks calm.
-                </p>
-              </div>
-            )}
-          </div>
-        </section>
+              )}
+            </div>
+          </section>
+        </>
       )}
 
       <section className="grid gap-4 xl:grid-cols-[1.05fr_0.95fr]">
@@ -1068,7 +1160,7 @@ const billsSparklinePoints = isYearlyView
             <div className="pointer-events-none absolute inset-y-0 right-0 z-0 w-[52%] overflow-hidden">
               <BudgetCatMascot
                 className="absolute inset-0 flex h-full w-full items-center justify-center"
-                imageClassName="h-full w-full scale-[3.75] object-contain object-center drop-shadow-2xl"
+                imageClassName="h-full w-full scale-[3.75] object-contain object-center"
                 variant="both"
               />
             </div>
@@ -1156,10 +1248,11 @@ const billsSparklinePoints = isYearlyView
             </div>
           </article>
 
-        <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
+<section className="grid gap-3 md:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
   <DashboardStatCard
     helper={incomeTrend.label}
     icon={CircleDollarSign}
+    sparklineDelayMs={0}
     title="Income"
     tone="green"
     trend={incomeTrend}
@@ -1170,6 +1263,7 @@ const billsSparklinePoints = isYearlyView
   <DashboardStatCard
     helper={expenseTrend.label}
     icon={ReceiptText}
+    sparklineDelayMs={120}
     title="Expenses"
     tone="red"
     trend={expenseTrend}
@@ -1182,6 +1276,7 @@ const billsSparklinePoints = isYearlyView
       statBills.length === 1 ? "" : "s"
     } ${isYearlyView ? "this year" : "this month"}`}
     icon={CreditCard}
+    sparklineDelayMs={240}
     title="Bills"
     tone="amber"
     trend={billsTrend}
@@ -1192,6 +1287,7 @@ const billsSparklinePoints = isYearlyView
   <DashboardStatCard
     helper={savingsTrend.label}
     icon={PiggyBank}
+    sparklineDelayMs={360}
     title="Savings"
     tone="blue"
     trend={savingsTrend}
@@ -1224,7 +1320,7 @@ const billsSparklinePoints = isYearlyView
               <div className="bc-progress-track">
                 <div
                   className={cn(
-                    "bc-progress-fill",
+                    "bc-progress-fill bc-progress-fill-glow",
                     remainingPercent < 20 && "bc-progress-fill-danger",
                     remainingPercent >= 20 &&
                       remainingPercent < 40 &&
@@ -1331,7 +1427,7 @@ const billsSparklinePoints = isYearlyView
             </div>
 
             <div className="mt-4">
-              <p className="mb-3 text-sm font-black text-[var(--bc-text)]">
+              <p className="mb-3 text-center text-sm font-black text-[var(--bc-text)] md:text-left">
                 Quick Actions
               </p>
 
@@ -1569,7 +1665,7 @@ const billsSparklinePoints = isYearlyView
 
           <div className="rounded-[22px] border border-[var(--bc-border)] bg-[var(--bc-surface-soft)]/55 p-4">
             <div className="flex items-start gap-3">
-              <div className="bc-icon-circle-green">
+              <div className="bc-icon-circle bc-icon-circle-green">
                 <Landmark className="h-4.5 w-4.5" />
               </div>
 
@@ -1660,3 +1756,4 @@ const billsSparklinePoints = isYearlyView
     </div>
   );
 }
+

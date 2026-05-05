@@ -644,6 +644,132 @@ svg {
   }
 }
 
+@keyframes bc-wave {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+
+  15% {
+    transform: rotate(14deg);
+  }
+
+  30% {
+    transform: rotate(-8deg);
+  }
+
+  45% {
+    transform: rotate(14deg);
+  }
+
+  60% {
+    transform: rotate(-4deg);
+  }
+}
+
+@keyframes bc-bell-ring {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+
+  12% {
+    transform: rotate(12deg);
+  }
+
+  24% {
+    transform: rotate(-10deg);
+  }
+
+  36% {
+    transform: rotate(8deg);
+  }
+
+  48% {
+    transform: rotate(-5deg);
+  }
+}
+
+@keyframes bc-notification-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+
+  50% {
+    transform: scale(1.22);
+    opacity: 0.65;
+  }
+}
+
+@keyframes bc-sparkline-draw {
+  0% {
+    stroke-dashoffset: 100;
+    opacity: 0.22;
+  }
+
+  100% {
+    stroke-dashoffset: 0;
+    opacity: 1;
+  }
+}
+
+@keyframes bc-sparkline-fill-reveal {
+  0% {
+    transform: scaleX(0);
+    opacity: 0;
+  }
+
+  100% {
+    transform: scaleX(1);
+    opacity: 0.08;
+  }
+}
+
+@keyframes bc-progress-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 0 rgba(95, 159, 105, 0.15);
+  }
+
+  50% {
+    box-shadow: 0 0 14px rgba(95, 159, 105, 0.55);
+  }
+}
+
+@keyframes bc-note-icon-pop {
+  0%,
+  100% {
+    transform: scale(1) rotate(0deg);
+  }
+
+  45% {
+    transform: scale(1.08) rotate(-6deg);
+  }
+
+  70% {
+    transform: scale(0.98) rotate(4deg);
+  }
+}
+
+@keyframes bc-reports-icon-intro {
+  0% {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.72) rotate(-10deg);
+  }
+
+  45% {
+    opacity: 1;
+    transform: translateY(0) scale(1.06) rotate(4deg);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1) rotate(0deg);
+  }
+}
+
 @media (min-width: 768px) {
   .bc-page {
     width: min(100%, 1180px);
@@ -822,6 +948,58 @@ svg {
     max-height: calc(100dvh - 1rem);
     overflow-y: auto;
   }
+
+  .bc-wave-emoji {
+    display: inline-block;
+    transform-origin: 70% 70%;
+    animation: bc-wave 1.8s ease-in-out infinite;
+  }
+
+  .bc-bell-active {
+    transform-origin: top center;
+    animation: bc-bell-ring 1.2s ease-in-out infinite;
+  }
+
+  .bc-notification-dot-pulse {
+    animation: bc-notification-pulse 1.3s ease-in-out infinite;
+  }
+
+  .bc-sparkline-line-draw {
+    stroke-dasharray: 100;
+    stroke-dashoffset: 100;
+    animation: bc-sparkline-draw 1250ms cubic-bezier(0.22, 1, 0.36, 1) both;
+    animation-delay: var(--bc-sparkline-delay, 0ms);
+  }
+
+  .bc-sparkline-axis-reveal {
+    stroke-dasharray: 100;
+    stroke-dashoffset: 100;
+    animation: bc-sparkline-draw 900ms ease-out both;
+    animation-delay: calc(var(--bc-sparkline-delay, 0ms) + 60ms);
+  }
+
+  .bc-sparkline-fill-reveal {
+    transform-origin: left center;
+    transform-box: fill-box;
+    animation: bc-sparkline-fill-reveal 1150ms cubic-bezier(0.22, 1, 0.36, 1)
+      both;
+    animation-delay: calc(var(--bc-sparkline-delay, 0ms) + 40ms);
+  }
+
+  .bc-progress-fill-glow {
+    animation: bc-progress-glow 1.8s ease-in-out infinite;
+  }
+
+  .bc-note-icon-pop {
+    animation: bc-note-icon-pop 2s ease-in-out infinite;
+    transform-origin: center;
+  }
+
+  .bc-reports-icon-intro {
+    animation: bc-reports-icon-intro 1250ms cubic-bezier(0.22, 1, 0.36, 1)
+      120ms both;
+    transform-origin: center;
+  }
 }
 
 @media (max-width: 430px) {
@@ -933,5 +1111,99 @@ svg {
     background:
       radial-gradient(circle at 60% -12%, rgba(114, 191, 122, 0.12), transparent 32rem),
       linear-gradient(180deg, var(--bc-bg-deep) 0%, var(--bc-bg) 45%, var(--bc-bg-deep) 100%);
+  }
+
+  .reports-mascot-svg {
+  width: min(100%, 360px);
+  aspect-ratio: 520 / 360;
+  margin-inline: auto;
+  pointer-events: none;
+  user-select: none;
+}
+
+@media (min-width: 768px) {
+  .reports-mascot-svg {
+    width: min(100%, 420px);
+  }
+}
+
+}
+
+.reports-png-mascot-tile {
+  position: relative;
+  isolation: isolate;
+}
+
+.reports-png-mascot-glow {
+  position: absolute;
+  inset: 14%;
+  z-index: 0;
+  border-radius: 999px;
+  background:
+    radial-gradient(circle at 45% 35%, var(--bc-amber-glow), transparent 58%),
+    radial-gradient(circle at 62% 62%, var(--bc-green-glow), transparent 62%);
+  filter: blur(16px);
+  opacity: 0.9;
+  animation: reportsMascotGlow 5.5s ease-in-out infinite;
+}
+
+.reports-png-mascot {
+  position: relative;
+  z-index: 1;
+  width: min(100%, 250px);
+  max-height: 155px;
+  object-fit: contain;
+  object-position: center;
+  transform-origin: 50% 78%;
+  animation: reportsMascotFloat 4.8s ease-in-out infinite;
+  filter: drop-shadow(0 16px 18px rgba(4, 17, 17, 0.22));
+}
+
+@media (min-width: 640px) {
+  .reports-png-mascot {
+    width: min(100%, 300px);
+    max-height: 180px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .reports-png-mascot {
+    width: min(100%, 330px);
+    max-height: 190px;
+  }
+}
+
+@keyframes reportsMascotFloat {
+  0%,
+  100% {
+    transform: translateY(0) scale(1) rotate(-0.4deg);
+  }
+
+  35% {
+    transform: translateY(-5px) scale(1.018) rotate(0.5deg);
+  }
+
+  65% {
+    transform: translateY(-2px) scale(1.008) rotate(-0.2deg);
+  }
+}
+
+@keyframes reportsMascotGlow {
+  0%,
+  100% {
+    opacity: 0.72;
+    transform: scale(0.96);
+  }
+
+  50% {
+    opacity: 1;
+    transform: scale(1.04);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reports-png-mascot,
+  .reports-png-mascot-glow {
+    animation: none;
   }
 }

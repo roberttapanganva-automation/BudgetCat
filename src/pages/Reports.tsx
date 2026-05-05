@@ -30,6 +30,7 @@ import {
 
 import { useAuth } from "../contexts/AuthContext";
 import { getCategoryLabel } from "../lib/categoryConfig";
+import { getDueDateIcon } from "../lib/iconMap";
 import { db } from "../lib/localDb";
 import { cn, formatCurrency } from "../lib/utils";
 import type { LocalDueDate, LocalTransaction } from "../types/finance";
@@ -389,12 +390,14 @@ function MetricCard({
   helper,
   icon: Icon,
   tone,
+  className,
 }: {
   label: string;
   value: number;
   helper: string;
   icon: LucideIcon;
   tone: "green" | "red" | "amber" | "blue" | "purple";
+  className?: string;
 }) {
   const toneClasses = {
     green: {
@@ -425,7 +428,7 @@ function MetricCard({
   }[tone];
 
   return (
-    <article className={cn("rounded-[22px] border p-4", toneClasses.card)}>
+    <article className={cn("rounded-[22px] border p-4", toneClasses.card, className)}>
       <div className="flex items-start justify-between gap-3">
         <div className={cn("bc-icon-circle h-10 w-10", toneClasses.icon)}>
           <Icon className="h-4.5 w-4.5" strokeWidth={2.4} />
@@ -504,6 +507,31 @@ function BillList({ bills }: { bills: ReportBill[] }) {
     return <EmptyState>No bill data found for this period.</EmptyState>;
   }
 
+  function getReportBillIcon(bill: ReportBill) {
+    const safeStatus =
+      bill.status === "paid" || bill.status === "overdue"
+        ? bill.status
+        : "upcoming";
+
+    const virtualBill: LocalDueDate = {
+      id: bill.id,
+      household_id: "",
+      user_id: "",
+      sync_status: "synced",
+      created_at: bill.dueDate || "2026-01-01",
+      updated_at: bill.dueDate || "2026-01-01",
+      title: bill.title,
+      amount: bill.amount,
+      due_date: bill.dueDate,
+      repeat_type: "monthly",
+      reminder_days: 0,
+      status: safeStatus,
+      note: "",
+    };
+
+    return getDueDateIcon(virtualBill);
+  }
+
   return (
     <div className="space-y-2">
       {bills.slice(0, 6).map((bill) => (
@@ -512,7 +540,7 @@ function BillList({ bills }: { bills: ReportBill[] }) {
           key={bill.id}
         >
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[var(--bc-border)] bg-[var(--bc-card)] text-lg">
-            🧾
+            {getReportBillIcon(bill)}
           </div>
 
           <div className="min-w-0 flex-1">
@@ -638,7 +666,7 @@ export function Reports() {
         };
 
   return (
-    <div className="mx-auto min-h-screen w-full max-w-[430px] px-5 pb-28 pt-5 md:max-w-none md:px-0 md:pb-8 md:pt-0">
+    <div className="mx-auto w-full max-w-[430px] px-5 pb-20 pt-5 md:max-w-none md:px-0 md:pb-8 md:pt-0">
       <header className="mb-5 flex items-start justify-between gap-4">
         <div className="min-w-0">
           <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[var(--bc-text-muted)]">
@@ -652,7 +680,7 @@ export function Reports() {
           </p>
         </div>
 
-        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-[var(--bc-border)] bg-[var(--bc-card)] text-[var(--bc-green)]">
+        <div className="bc-reports-icon-intro flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-[var(--bc-border)] bg-[var(--bc-card)] text-[var(--bc-green)]">
           <BarChart3 className="h-5 w-5" strokeWidth={2.4} />
         </div>
       </header>
@@ -729,8 +757,20 @@ export function Reports() {
         </section>
       )}
 
-      <section className="mb-4 grid grid-cols-2 gap-3 xl:grid-cols-5">
+      <section className="mb-4 grid grid-cols-2 gap-3">
+        <div className="reports-png-mascot-tile col-start-1 row-start-1 flex min-h-[170px] items-center justify-center overflow-hidden rounded-[var(--bc-radius-xl)] border border-[var(--bc-border)] bg-[linear-gradient(180deg,var(--bc-card-elevated),var(--bc-card))] p-2 sm:min-h-[190px]">
+          <div className="reports-png-mascot-glow" aria-hidden="true" />
+          <img
+            src="/assets/mascots/bonnie-clyde-reporting.png"
+            alt=""
+            aria-hidden="true"
+            className="reports-png-mascot"
+            draggable={false}
+          />
+        </div>
+
         <MetricCard
+          className="col-start-2 row-start-1"
           helper="Recorded money coming in"
           icon={CircleDollarSign}
           label="Income"
@@ -739,6 +779,7 @@ export function Reports() {
         />
 
         <MetricCard
+          className="col-start-1 row-start-3"
           helper="Expense transactions only"
           icon={ReceiptText}
           label="Expenses"
@@ -747,6 +788,7 @@ export function Reports() {
         />
 
         <MetricCard
+          className="col-start-2 row-start-2"
           helper={`${bills.length} bill${bills.length === 1 ? "" : "s"} in view`}
           icon={CreditCard}
           label="Bills"
@@ -755,6 +797,7 @@ export function Reports() {
         />
 
         <MetricCard
+          className="col-start-1 row-start-2"
           helper="Savings and goal contributions"
           icon={PiggyBank}
           label="Savings"
@@ -763,6 +806,7 @@ export function Reports() {
         />
 
         <MetricCard
+          className="col-start-2 row-start-3"
           helper={netTone.helper}
           icon={Wallet}
           label="Net"
@@ -783,7 +827,7 @@ export function Reports() {
               </p>
             </div>
 
-            <div className="bc-icon-circle-blue">
+            <div className="bc-icon-circle bc-icon-circle-blue">
               <PieChartIcon className="h-4.5 w-4.5" />
             </div>
           </div>
@@ -852,7 +896,7 @@ export function Reports() {
               </p>
             </div>
 
-            <div className="bc-icon-circle-green">
+            <div className="bc-icon-circle bc-icon-circle-green">
               <TrendingUp className="h-4.5 w-4.5" />
             </div>
           </div>
@@ -954,7 +998,7 @@ export function Reports() {
               </p>
             </div>
 
-            <div className="bc-icon-circle-amber">
+            <div className="bc-icon-circle bc-icon-circle-amber">
               <CreditCard className="h-4.5 w-4.5" />
             </div>
           </div>
@@ -973,7 +1017,7 @@ export function Reports() {
               </p>
             </div>
 
-            <div className="bc-icon-circle-green">
+            <div className="bc-icon-circle bc-icon-circle-green">
               <ListChecks className="h-4.5 w-4.5" />
             </div>
           </div>
@@ -986,7 +1030,7 @@ export function Reports() {
               return (
                 <div
                   className={cn(
-                    "flex items-start gap-3 rounded-[18px] border p-3",
+                    "flex items-center gap-3 rounded-[18px] border p-3",
                     isWarning
                       ? "border-[var(--bc-red)]/20 bg-[var(--bc-red-glow)]"
                       : "border-[var(--bc-green)]/20 bg-[var(--bc-green-glow)]",
@@ -995,7 +1039,7 @@ export function Reports() {
                 >
                   <div
                     className={cn(
-                      "flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[var(--bc-border)] bg-[var(--bc-card)]",
+                      "bc-note-icon-pop flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[var(--bc-border)] bg-[var(--bc-card)]",
                       isWarning ? "text-[var(--bc-red)]" : "text-[var(--bc-green)]",
                     )}
                   >
@@ -1006,7 +1050,7 @@ export function Reports() {
                     )}
                   </div>
 
-                  <p className="text-xs font-semibold leading-relaxed text-[var(--bc-text-soft)]">
+                  <p className="self-center text-xs font-semibold leading-relaxed text-[var(--bc-text-soft)]">
                     {message}
                   </p>
                 </div>
