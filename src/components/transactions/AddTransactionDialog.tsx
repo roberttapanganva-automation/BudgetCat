@@ -38,6 +38,51 @@ const transactionTypes: Array<{ label: string; value: TransactionType }> = [
   { label: "Goal Contribution", value: "goal_contribution" },
 ];
 
+const transactionTypeEmojis: Record<TransactionType, string> = {
+  expense: "🧾",
+  income: "💵",
+  salary: "💼",
+  savings: "🌱",
+  goal_contribution: "🎯",
+};
+
+const categoryEmojis: Record<string, string> = {
+  salary: "💼",
+  freelance: "💻",
+  "business-income": "🏢",
+  bonus: "🎁",
+  allowance: "🤝",
+  refund: "🔁",
+  interest: "🏦",
+  "gift-income": "🎉",
+  "other-income": "💵",
+  "food-groceries": "🛒",
+  "dining-out": "🍽️",
+  "coffee-snacks": "☕",
+  transportation: "🚌",
+  fuel: "⛽",
+  shopping: "🛍️",
+  "health-medicine": "💊",
+  education: "📚",
+  entertainment: "🎬",
+  fitness: "🏋️",
+  "personal-care": "✨",
+  household: "🏠",
+  pets: "🐾",
+  travel: "✈️",
+  "fees-charges": "🧾",
+  "debt-payment": "💳",
+  "other-expense": "🗂️",
+  "emergency-fund": "🛡️",
+  "travel-goal": "✈️",
+  "home-goal": "🏠",
+  "gadget-goal": "📱",
+  "education-goal": "📚",
+  investment: "📈",
+  "general-savings": "🐷",
+  "other-goal": "🎯",
+};
+
 const mobileTransactionTypes: Array<{ label: string; value: TransactionType }> =
   [
     { label: "Expense", value: "expense" },
@@ -260,7 +305,7 @@ export function AddTransactionDialog({
 
             <button
               aria-label="Close Quick Add"
-              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[18px] border border-[var(--bc-border)] bg-[var(--bc-card)] text-[var(--bc-text)] transition hover:bg-[var(--bc-surface-soft)]"
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[18px] border border-[var(--bc-red)]/30 bg-[var(--bc-red-glow)] text-[var(--bc-red)] transition hover:bg-[var(--bc-red)] hover:text-white"
               onClick={() => setIsOpen(false)}
               type="button"
             >
@@ -317,6 +362,7 @@ export function AddTransactionDialog({
                 {mobileTransactionTypes.map((transactionType) => {
                   const isActive = type === transactionType.value;
                   const isExpense = transactionType.value === "expense";
+                  const isSaving = transactionType.value === "savings";
 
                   return (
                     <button
@@ -325,6 +371,8 @@ export function AddTransactionDialog({
                         isActive
                           ? isExpense
                             ? "border-[var(--bc-red)]/30 bg-[var(--bc-red-glow)] text-[var(--bc-red)]"
+                            : isSaving
+                              ? "border-[var(--bc-blue)]/30 bg-[var(--bc-blue)]/14 text-[var(--bc-blue)]"
                             : "border-[var(--bc-green)]/30 bg-[var(--bc-green-glow)] text-[var(--bc-green)]"
                           : "border-[var(--bc-border)] bg-[var(--bc-card)] text-[var(--bc-text-muted)]",
                       ].join(" ")}
@@ -385,6 +433,7 @@ export function AddTransactionDialog({
                         key={transactionType.value}
                         value={transactionType.value}
                       >
+                        {transactionTypeEmojis[transactionType.value]}{" "}
                         {transactionType.label}
                       </option>
                     ))}
@@ -417,13 +466,14 @@ export function AddTransactionDialog({
                     onChange={(event) => setCategory(event.target.value)}
                     value={category}
                   >
-                    <option value="">Select category</option>
+                    <option value="">🏷️ Select category</option>
 
                     {categoryOptions.map((categoryOption) => (
                       <option
                         key={categoryOption.id}
                         value={categoryOption.id}
                       >
+                        {categoryEmojis[categoryOption.id] ?? "🏷️"}{" "}
                         {categoryOption.label}
                       </option>
                     ))}
@@ -484,7 +534,7 @@ export function AddTransactionDialog({
                   disabled={isSaving}
                   onClick={() => setIsOpen(false)}
                   type="button"
-                  variant="secondary"
+                  variant="urgent"
                 >
                   Cancel
                 </Button>

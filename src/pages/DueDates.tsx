@@ -49,6 +49,18 @@ const tabLabels: Record<BillTab, string> = {
   overdue: "Overdue",
 };
 
+const tabIcons: Record<BillTab, typeof Clock3> = {
+  upcoming: Clock3,
+  paid: CheckCircle2,
+  overdue: AlertTriangle,
+};
+
+const tabActiveStyles: Record<BillTab, string> = {
+  upcoming: "bg-[var(--bc-amber-glow)] text-[var(--bc-amber)]",
+  paid: "bg-[var(--bc-green-glow)] text-[var(--bc-green)]",
+  overdue: "bg-[var(--bc-red-glow)] text-[var(--bc-red)]",
+};
+
 const statusStyles: Record<
   BillTab,
   {
@@ -428,7 +440,7 @@ export function DueDates() {
 
   return (
     <>
-      <div className="mx-auto min-h-screen w-full max-w-[430px] px-5 pb-28 pt-5 md:max-w-none md:px-0 md:pb-8 md:pt-0">
+      <div className="mx-auto w-full max-w-[430px] px-5 pb-20 pt-5 md:max-w-none md:px-0 md:pb-8 md:pt-0">
         <header className="mb-5 flex items-center justify-between gap-4">
           <div className="min-w-0">
             <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[var(--bc-text-muted)]">
@@ -548,15 +560,19 @@ export function DueDates() {
             {(["upcoming", "paid", "overdue"] as BillTab[]).map((tab) => (
               <button
                 className={cn(
-                  "min-h-10 rounded-2xl text-xs font-black transition",
+                  "flex min-h-10 items-center justify-center gap-1.5 rounded-2xl text-xs font-black transition",
                   activeTab === tab
-                    ? "bg-[var(--bc-green-glow)] text-[var(--bc-green)]"
+                    ? tabActiveStyles[tab]
                     : "text-[var(--bc-text-muted)] hover:bg-[var(--bc-surface-soft)] hover:text-[var(--bc-text)]",
                 )}
                 key={tab}
                 onClick={() => setActiveTab(tab)}
                 type="button"
               >
+                {(() => {
+                  const Icon = tabIcons[tab];
+                  return <Icon className="h-3.5 w-3.5 shrink-0" />;
+                })()}
                 {tabLabels[tab]}
                 <span className="ml-1 text-[10px] opacity-70">
                   {billBuckets[tab].length}

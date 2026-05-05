@@ -7,15 +7,14 @@ import {
   Database,
   Download,
   FileDown,
+  FileJson,
   Loader2,
   LogOut,
-  Moon,
   Palette,
   RefreshCcw,
   Settings as SettingsIcon,
   ShieldCheck,
   Smartphone,
-  Sun,
   Trash2,
   UserRound,
   Volume2,
@@ -132,7 +131,7 @@ function SectionTitle({
           {title}
         </h2>
         {subtitle ? (
-          <p className="mt-1 text-xs font-semibold leading-relaxed text-[var(--bc-text-muted)]">
+          <p className="mt-0.5 text-xs font-semibold leading-relaxed text-[var(--bc-text-muted)]">
             {subtitle}
           </p>
         ) : null}
@@ -186,20 +185,26 @@ function ToggleRow({
 function ExportButton({
   label,
   description,
+  variant = "csv",
   onClick,
 }: {
   label: string;
   description: string;
+  variant?: "csv" | "json";
   onClick: () => void;
 }) {
+  const isJson = variant === "json";
+  const Icon = isJson ? FileJson : FileDown;
+  const iconClass = isJson ? "bc-icon-circle-amber" : "bc-icon-circle-blue";
+
   return (
     <button
       className="flex w-full items-center gap-3 rounded-[18px] border border-[var(--bc-border)] bg-[var(--bc-surface-soft)]/60 p-3 text-left transition hover:border-[var(--bc-border-strong)] hover:bg-[var(--bc-card)]"
       onClick={onClick}
       type="button"
     >
-      <div className="bc-icon-circle-blue h-10 w-10 shrink-0">
-        <FileDown className="h-4.5 w-4.5" />
+      <div className={cn("bc-icon-circle h-10 w-10 shrink-0", iconClass)}>
+        <Icon className="h-4.5 w-4.5" />
       </div>
 
       <div className="min-w-0 flex-1">
@@ -538,7 +543,7 @@ export function Settings() {
         />
 
         <div className="rounded-[22px] border border-[var(--bc-border)] bg-[var(--bc-surface-soft)]/60 p-4">
-          <div className="flex items-start gap-3">
+          <div className="flex items-start gap-2.5">
             <div
               className={cn(
                 "bc-icon-circle h-11 w-11 shrink-0",
@@ -594,7 +599,7 @@ export function Settings() {
 
         {latestSyncError && (
           <div className="mt-3 rounded-[20px] border border-[var(--bc-red)]/20 bg-[var(--bc-red-glow)] p-4">
-            <div className="flex items-start gap-3">
+            <div className="flex items-start gap-2.5">
               <div className="bc-icon-circle-red h-10 w-10 shrink-0">
                 <AlertTriangle className="h-4.5 w-4.5" />
               </div>
@@ -603,7 +608,7 @@ export function Settings() {
                 <p className="text-sm font-black text-[var(--bc-text)]">
                   Sync failed for {latestSyncError.tableName}
                 </p>
-                <p className="mt-1 text-xs font-semibold leading-relaxed text-[var(--bc-text-muted)]">
+                <p className="mt-0.5 text-xs font-semibold leading-relaxed text-[var(--bc-text-muted)]">
                   {latestSyncError.message}
                 </p>
                 {latestSyncError.code ? (
@@ -802,6 +807,7 @@ export function Settings() {
           <ExportButton
             description="Complete local JSON backup"
             label="Full Backup JSON"
+            variant="json"
             onClick={() => handleExport("full_backup_json")}
           />
 
@@ -850,7 +856,7 @@ export function Settings() {
           <p className="text-sm font-black text-[var(--bc-text)]">
             Clear local test data
           </p>
-          <p className="mt-1 text-xs font-semibold leading-relaxed text-[var(--bc-text-muted)]">
+          <p className="mt-0.5 text-xs font-semibold leading-relaxed text-[var(--bc-text-muted)]">
             This clears local test records only. Supabase data is not changed.
           </p>
         </div>
@@ -874,9 +880,9 @@ export function Settings() {
         </button>
       </section>
 
-      <section className="bc-card p-4">
-        <div className="flex items-start gap-3">
-          <div className="bc-icon-circle-green">
+      <section className="bc-card p-3">
+        <div className="flex items-start gap-2.5">
+          <div className="bc-icon-circle bc-icon-circle-green h-10 w-10 shrink-0">
             <ShieldCheck className="h-4.5 w-4.5" />
           </div>
 
@@ -884,21 +890,15 @@ export function Settings() {
             <p className="text-sm font-black text-[var(--bc-text)]">
               Private personal budget tracker
             </p>
-            <p className="mt-1 text-xs font-semibold leading-relaxed text-[var(--bc-text-muted)]">
+            <p className="mt-0.5 text-xs font-semibold leading-relaxed text-[var(--bc-text-muted)]">
               BudgetCat uses manual entries, local-first storage, and sync when
               available. No bank connection. No sample finance data.
             </p>
           </div>
         </div>
-
-        <div className="mt-4 flex items-center gap-2 text-[11px] font-black text-[var(--bc-text-muted)]">
-          <Sun className="h-3.5 w-3.5" />
-          Light mode
-          <span>•</span>
-          <Moon className="h-3.5 w-3.5" />
-          Dark mode
-        </div>
       </section>
     </div>
   );
 }
+
+
