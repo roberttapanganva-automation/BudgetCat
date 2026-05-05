@@ -74,13 +74,11 @@ export function Sidebar() {
       <div className="flex min-h-0 w-full flex-col">
         <div className="bc-card-elevated mb-5 overflow-hidden p-4">
           <div className="flex items-center gap-3">
-            <div className="flex h-14 w-14 items-center justify-center rounded-3xl bg-[var(--bc-green-glow)]">
-              <BudgetCatMascot
-                className="h-12 w-12"
-                imageClassName="h-full w-full object-contain"
-                variant="icon"
-              />
-            </div>
+            <BudgetCatMascot
+              className="h-12 w-12 shrink-0"
+              imageClassName="h-full w-full object-contain"
+              variant="icon"
+            />
 
             <div className="min-w-0">
               <p className="text-lg font-black leading-tight tracking-[-0.03em] text-[var(--bc-text)]">
@@ -89,25 +87,6 @@ export function Sidebar() {
               <p className="text-xs font-semibold text-[var(--bc-text-muted)]">
                 Smart. Friendly. Focused.
               </p>
-            </div>
-          </div>
-
-          <div className="mt-4 rounded-[20px] border border-[var(--bc-border)] bg-[var(--bc-card)]/80 p-3">
-            <div className="flex items-center gap-3">
-              <BudgetCatMascot
-                className="h-16 w-20 shrink-0"
-                imageClassName="h-full w-full object-contain"
-                variant="both"
-              />
-
-              <div className="min-w-0">
-                <p className="text-xs font-black text-[var(--bc-text)]">
-                  Bonnie & Clyde
-                </p>
-                <p className="mt-1 text-[11px] leading-snug text-[var(--bc-text-muted)]">
-                  Keeping your budget calm and organized.
-                </p>
-              </div>
             </div>
           </div>
         </div>

@@ -702,10 +702,11 @@ export function Reports() {
         </div>
 
         <div className="mt-4 grid grid-cols-[1fr_0.72fr] gap-3">
-          <label className="block">
+          <label className="relative block">
             <span className="sr-only">Month or yearly report</span>
+            <CalendarDays className="pointer-events-none absolute left-3 top-1/2 z-[1] h-4 w-4 -translate-y-1/2 text-[var(--bc-green)]" />
             <select
-              className="bc-input"
+              className="bc-input pl-10"
               onChange={(event) =>
                 setSelectedReportView(event.target.value as ReportView)
               }
@@ -740,7 +741,7 @@ export function Reports() {
       {!hasSummaryData(summary) && (
         <section className="mb-4 rounded-[22px] border border-[var(--bc-amber)]/20 bg-[var(--bc-amber-glow)] p-4">
           <div className="flex items-start gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[var(--bc-border)] bg-[var(--bc-card)] text-[var(--bc-amber)]">
+            <div className="bc-reports-empty-icon-glow flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[var(--bc-border)] bg-[var(--bc-card)] text-[var(--bc-amber)]">
               <Sparkles className="h-4.5 w-4.5" />
             </div>
 
@@ -758,7 +759,7 @@ export function Reports() {
       )}
 
       <section className="mb-4 grid grid-cols-2 gap-3">
-        <div className="reports-png-mascot-tile col-start-1 row-start-1 flex min-h-[170px] items-center justify-center overflow-hidden rounded-[var(--bc-radius-xl)] border border-[var(--bc-border)] bg-[linear-gradient(180deg,var(--bc-card-elevated),var(--bc-card))] p-2 sm:min-h-[190px]">
+        <div className="reports-png-mascot-tile col-start-1 row-start-1 flex min-h-[170px] items-center justify-center sm:min-h-[190px]">
           <div className="reports-png-mascot-glow" aria-hidden="true" />
           <img
             src="/assets/mascots/bonnie-clyde-reporting.png"
@@ -779,7 +780,7 @@ export function Reports() {
         />
 
         <MetricCard
-          className="col-start-1 row-start-3"
+          className="col-start-1 row-start-2"
           helper="Expense transactions only"
           icon={ReceiptText}
           label="Expenses"
@@ -797,7 +798,7 @@ export function Reports() {
         />
 
         <MetricCard
-          className="col-start-1 row-start-2"
+          className="col-start-2 row-start-3"
           helper="Savings and goal contributions"
           icon={PiggyBank}
           label="Savings"
@@ -806,7 +807,7 @@ export function Reports() {
         />
 
         <MetricCard
-          className="col-start-2 row-start-3"
+          className="col-start-1 row-start-3"
           helper={netTone.helper}
           icon={Wallet}
           label="Net"

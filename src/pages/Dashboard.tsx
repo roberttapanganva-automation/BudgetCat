@@ -570,7 +570,7 @@ function DashboardStatSparkline({
 
     const y =
       maxValue <= 0
-        ? chartHeight / 2
+        ? baselineY
         : paddingY +
           (1 - point.value / maxValue) * (chartHeight - paddingY * 2);
 
@@ -584,13 +584,6 @@ function DashboardStatSparkline({
   const linePoints = chartPoints
     .map((point) => `${point.x},${point.y}`)
     .join(" ");
-
-  const areaPoints =
-    chartPoints.length > 1
-      ? `${linePoints} ${
-          chartPoints[chartPoints.length - 1].x
-        },${baselineY} ${chartPoints[0].x},${baselineY}`
-      : "";
 
   return (
     <div className="flex min-w-[132px] items-center justify-end">
@@ -606,15 +599,6 @@ function DashboardStatSparkline({
           }
           viewBox={`0 0 ${chartWidth} ${chartHeight}`}
         >
-          {areaPoints ? (
-            <polygon
-              className="bc-sparkline-fill-reveal"
-              fill="currentColor"
-              opacity="0.08"
-              points={areaPoints}
-            />
-          ) : null}
-
           <polyline
             className="bc-sparkline-line-draw"
             fill="none"
@@ -625,19 +609,6 @@ function DashboardStatSparkline({
             strokeLinecap="round"
             strokeLinejoin="round"
             strokeWidth="3"
-          />
-
-          <line
-            className="bc-sparkline-axis-reveal"
-            opacity="0.16"
-            pathLength={100}
-            stroke="currentColor"
-            strokeLinecap="round"
-            strokeWidth="1"
-            x1={paddingX}
-            x2={chartWidth - paddingX}
-            y1={baselineY}
-            y2={baselineY}
           />
         </svg>
       </div>

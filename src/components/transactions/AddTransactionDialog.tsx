@@ -362,6 +362,7 @@ export function AddTransactionDialog({
                 {mobileTransactionTypes.map((transactionType) => {
                   const isActive = type === transactionType.value;
                   const isExpense = transactionType.value === "expense";
+                  const isSaving = transactionType.value === "savings";
 
                   return (
                     <button
@@ -370,6 +371,8 @@ export function AddTransactionDialog({
                         isActive
                           ? isExpense
                             ? "border-[var(--bc-red)]/30 bg-[var(--bc-red-glow)] text-[var(--bc-red)]"
+                            : isSaving
+                              ? "border-[var(--bc-blue)]/30 bg-[var(--bc-blue)]/14 text-[var(--bc-blue)]"
                             : "border-[var(--bc-green)]/30 bg-[var(--bc-green-glow)] text-[var(--bc-green)]"
                           : "border-[var(--bc-border)] bg-[var(--bc-card)] text-[var(--bc-text-muted)]",
                       ].join(" ")}

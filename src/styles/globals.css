@@ -803,6 +803,44 @@ svg {
 ========================================================= */
 
 @layer base {
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in srgb, var(--bc-green) 42%, var(--bc-blue) 28%) color-mix(in srgb, var(--bc-bg-deep) 56%, transparent);
+  }
+
+  *::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  *::-webkit-scrollbar-track {
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--bc-bg-deep) 56%, transparent);
+  }
+
+  *::-webkit-scrollbar-thumb {
+    border: 2px solid transparent;
+    border-radius: 999px;
+    background:
+      linear-gradient(
+        180deg,
+        color-mix(in srgb, var(--bc-green) 66%, var(--bc-blue) 34%),
+        color-mix(in srgb, var(--bc-green-soft) 62%, var(--bc-blue) 38%)
+      )
+      padding-box;
+    box-shadow: 0 0 10px color-mix(in srgb, var(--bc-green-glow) 80%, transparent);
+  }
+
+  *::-webkit-scrollbar-thumb:hover {
+    background:
+      linear-gradient(
+        180deg,
+        color-mix(in srgb, var(--bc-green) 70%, var(--bc-blue) 30%),
+        color-mix(in srgb, var(--bc-green-soft) 68%, var(--bc-blue) 32%)
+      )
+      padding-box;
+  }
+
   html {
     scroll-padding-bottom: 7.5rem;
   }
@@ -1000,6 +1038,44 @@ svg {
       120ms both;
     transform-origin: center;
   }
+
+  .bc-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in srgb, var(--bc-green) 42%, var(--bc-blue) 28%) color-mix(in srgb, var(--bc-bg-deep) 56%, transparent);
+  }
+
+  .bc-scrollbar::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  .bc-scrollbar::-webkit-scrollbar-track {
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--bc-bg-deep) 56%, transparent);
+  }
+
+  .bc-scrollbar::-webkit-scrollbar-thumb {
+    border: 2px solid transparent;
+    border-radius: 999px;
+    background:
+      linear-gradient(
+        180deg,
+        color-mix(in srgb, var(--bc-green) 66%, var(--bc-blue) 34%),
+        color-mix(in srgb, var(--bc-green-soft) 62%, var(--bc-blue) 38%)
+      )
+      padding-box;
+    box-shadow: 0 0 10px color-mix(in srgb, var(--bc-green-glow) 80%, transparent);
+  }
+
+  .bc-scrollbar::-webkit-scrollbar-thumb:hover {
+    background:
+      linear-gradient(
+        180deg,
+        color-mix(in srgb, var(--bc-green) 70%, var(--bc-blue) 30%),
+        color-mix(in srgb, var(--bc-green-soft) 68%, var(--bc-blue) 32%)
+      )
+      padding-box;
+  }
 }
 
 @media (max-width: 430px) {
@@ -1132,72 +1208,34 @@ svg {
 .reports-png-mascot-tile {
   position: relative;
   isolation: isolate;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  border-radius: 0;
+  overflow: visible;
 }
 
 .reports-png-mascot-glow {
-  position: absolute;
-  inset: 14%;
-  z-index: 0;
-  border-radius: 999px;
-  background:
-    radial-gradient(circle at 45% 35%, var(--bc-amber-glow), transparent 58%),
-    radial-gradient(circle at 62% 62%, var(--bc-green-glow), transparent 62%);
-  filter: blur(16px);
-  opacity: 0.9;
-  animation: reportsMascotGlow 5.5s ease-in-out infinite;
+  display: none;
 }
 
 .reports-png-mascot {
   position: relative;
   z-index: 1;
-  width: min(100%, 250px);
-  max-height: 155px;
+  width: 100%;
+  height: 100%;
+  max-height: none;
   object-fit: contain;
   object-position: center;
-  transform-origin: 50% 78%;
-  animation: reportsMascotFloat 4.8s ease-in-out infinite;
-  filter: drop-shadow(0 16px 18px rgba(4, 17, 17, 0.22));
-}
-
-@media (min-width: 640px) {
-  .reports-png-mascot {
-    width: min(100%, 300px);
-    max-height: 180px;
-  }
+  animation: none;
+  filter: none;
 }
 
 @media (min-width: 1024px) {
   .reports-png-mascot {
-    width: min(100%, 330px);
-    max-height: 190px;
-  }
-}
-
-@keyframes reportsMascotFloat {
-  0%,
-  100% {
-    transform: translateY(0) scale(1) rotate(-0.4deg);
-  }
-
-  35% {
-    transform: translateY(-5px) scale(1.018) rotate(0.5deg);
-  }
-
-  65% {
-    transform: translateY(-2px) scale(1.008) rotate(-0.2deg);
-  }
-}
-
-@keyframes reportsMascotGlow {
-  0%,
-  100% {
-    opacity: 0.72;
-    transform: scale(0.96);
-  }
-
-  50% {
-    opacity: 1;
-    transform: scale(1.04);
+    width: 84%;
+    height: 84%;
+    margin: 0 auto;
   }
 }
 
@@ -1206,4 +1244,8 @@ svg {
   .reports-png-mascot-glow {
     animation: none;
   }
+}
+
+.bc-reports-empty-icon-glow {
+  animation: bc-progress-glow 1.9s ease-in-out infinite;
 }
