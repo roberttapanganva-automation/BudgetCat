@@ -1,4 +1,4 @@
-import { AlertTriangle, CalendarClock, CalendarDays, CheckCircle2 } from "lucide-react";
+import { AlertTriangle, CalendarClock, CalendarDays, CheckCircle2 } from "../../lib/icons";
 import { Badge } from "../ui/Badge";
 import { AnimatedStatusIcon } from "../ui/AnimatedStatusIcon";
 

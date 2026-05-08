@@ -1,4 +1,4 @@
-import type { LucideIcon } from "lucide-react";
+import type { LucideIcon } from "./icons";
 import {
   BadgeDollarSign,
   Banknote,
@@ -38,7 +38,7 @@ import {
   Wallet,
   Wifi,
   Zap,
-} from "lucide-react";
+} from "./icons";
 
 export type BudgetCatCategoryType =
   | "income"

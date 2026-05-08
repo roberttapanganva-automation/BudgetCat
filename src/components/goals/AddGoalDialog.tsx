@@ -6,7 +6,7 @@ import {
   Plus,
   Sparkles,
   Target,
-} from "lucide-react";
+} from "../../lib/icons";
 import { type FormEvent, useState } from "react";
 
 import { useAuth } from "../../contexts/AuthContext";

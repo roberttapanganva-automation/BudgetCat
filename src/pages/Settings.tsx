@@ -19,7 +19,7 @@ import {
   UserRound,
   Volume2,
   VolumeX,
-} from "lucide-react";
+} from "../lib/icons";
 import { useEffect, useState } from "react";
 
 import { ThemeToggle } from "../components/layout/ThemeToggle";

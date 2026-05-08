@@ -47,6 +47,7 @@ export interface LocalDueDate extends LocalRecord {
   repeat_type: RepeatType;
   reminder_days: number;
   status: DueDateStatus;
+  paid_transaction_id?: string;
   note?: string;
 }
 

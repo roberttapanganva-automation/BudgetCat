@@ -6,7 +6,7 @@ import {
   useMemo,
   useState,
 } from "react";
-import { AlertCircle, AlertTriangle, CheckCircle2, Loader2 } from "lucide-react";
+import { AlertCircle, AlertTriangle, CheckCircle2, Loader2 } from "../../lib/icons";
 import { cn } from "../../lib/utils";
 import { AnimatedStatusIcon } from "./AnimatedStatusIcon";
 

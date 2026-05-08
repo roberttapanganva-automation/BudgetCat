@@ -1,4 +1,4 @@
-import { CalendarClock, Heart, type LucideIcon } from "lucide-react";
+import { CalendarClock, Heart, type LucideIcon } from "../../lib/icons";
 import type { DashboardMascotCheckIn } from "../../lib/mascotMood";
 import { BudgetCatMascot } from "../mascot/BudgetCatMascot";
 import { Card } from "../ui/Card";

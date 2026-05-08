@@ -16,7 +16,7 @@ import {
   Pencil,
   ReceiptText,
   Trash2,
-} from "lucide-react";
+} from "../lib/icons";
 import { type FormEvent, useEffect, useMemo, useState } from "react";
 
 import { AddDueDateDialog } from "../components/due-dates/AddDueDateDialog";
@@ -27,6 +27,7 @@ import { useToast } from "../hooks/useToast";
 import { getDueDateStatus } from "../lib/calculations";
 import { getDueDateIcon } from "../lib/iconMap";
 import {
+  addLocalTransaction,
   db,
   softDeleteLocalDueDate,
   updateLocalDueDate,
@@ -260,6 +261,14 @@ function getBillCategoryLabel(bill: LocalDueDate) {
   return "Bill";
 }
 
+function getBillPaymentMarker(billId: string) {
+  return `[bill:${billId}]`;
+}
+
+function getBillPaymentNote(billId: string, billTitle: string) {
+  return `Auto-created from bill payment - Paid bill: ${billTitle} ${getBillPaymentMarker(billId)}`;
+}
+
 function BillRow({
   bill,
   onEdit,
@@ -403,25 +412,110 @@ export function DueDates() {
     (sum, bill) => sum + bill.amount,
     0,
   );
-
-  async function updateBillStatus(bill: LocalDueDate, status: DueDateStatus) {
-    await updateLocalDueDate(bill.id, { status });
-
-    if (status === "paid") {
-      showToast({
-        title: "Bill marked paid ✅",
-        message: "Nice — that bill is cleared.",
-        tone: "success",
-      });
+  async function findLinkedBillPaymentTransactionId(bill: LocalDueDate) {
+    if (bill.paid_transaction_id) {
+      const linked = await db.transactions.get(bill.paid_transaction_id);
+      if (linked && !linked.deleted_at) {
+        return linked.id;
+      }
     }
 
-    if (user) {
+    const marker = getBillPaymentMarker(bill.id);
+    const matched = await db.transactions
+      .where("household_id")
+      .equals(householdId)
+      .filter(
+        (transaction) =>
+          !transaction.deleted_at &&
+          transaction.type === "expense" &&
+          (transaction.note ?? "").includes(marker),
+      )
+      .first();
+
+    return matched?.id ?? null;
+  }
+
+  async function markBillPaidWithExpense(bill: LocalDueDate) {
+    const existingTransactionId = await findLinkedBillPaymentTransactionId(bill);
+
+    if (existingTransactionId) {
+      if (bill.paid_transaction_id !== existingTransactionId || bill.status !== "paid") {
+        await updateLocalDueDate(bill.id, {
+          status: "paid",
+          paid_transaction_id: existingTransactionId,
+        });
+      }
+
+      showToast({
+        title: "This bill was already recorded.",
+        message: "Existing bill expense is already linked.",
+        tone: "warning",
+      });
+
+      if (user) {
+        requestBackgroundSync(user, "due_date_status_updated");
+      }
+      return;
+    }
+
+    if (!user) {
+      showToast({
+        title: "Could not mark bill paid.",
+        message: "No signed-in user found for this action.",
+        tone: "error",
+      });
+      return;
+    }
+
+    try {
+      const createdExpense = await addLocalTransaction(
+        {
+          type: "expense",
+          amount: Number(bill.amount || 0),
+          category: "fees-charges",
+          date: new Date().toISOString().slice(0, 10),
+          payment_method: "Cash",
+          note: getBillPaymentNote(bill.id, bill.title || "Untitled bill"),
+        },
+        user.id,
+        user.householdId,
+      );
+
+      await updateLocalDueDate(bill.id, {
+        status: "paid",
+        paid_transaction_id: createdExpense.id,
+      });
+
+      showToast({
+        title: "Bill paid and expense recorded.",
+        message: `Paid bill: ${bill.title || "Untitled bill"}`,
+        tone: "success",
+      });
+
       requestBackgroundSync(user, "due_date_status_updated");
+    } catch {
+      showToast({
+        title: "Could not record bill payment.",
+        message: "Bill was not marked paid. Please try again.",
+        tone: "error",
+      });
     }
   }
 
   async function toggleBillPaid(bill: LocalDueDate) {
-    await updateBillStatus(bill, bill.status === "paid" ? "upcoming" : "paid");
+    if (bill.status === "paid") {
+      await updateLocalDueDate(bill.id, {
+        status: "upcoming",
+        paid_transaction_id: undefined,
+      });
+
+      if (user) {
+        requestBackgroundSync(user, "due_date_status_updated");
+      }
+      return;
+    }
+
+    await markBillPaidWithExpense(bill);
   }
 
   async function deleteBill(bill: LocalDueDate) {
@@ -543,7 +637,7 @@ export function DueDates() {
 
                   <button
                     className="bc-button bc-button-primary mt-4 w-full"
-                    onClick={() => updateBillStatus(bill, "paid")}
+                    onClick={() => markBillPaidWithExpense(bill)}
                     type="button"
                   >
                     <CheckCircle2 className="h-4.5 w-4.5" />
@@ -914,3 +1008,4 @@ function EditDueDateModal({
     </Modal>
   );
 }
+
