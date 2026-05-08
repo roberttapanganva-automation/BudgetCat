@@ -1,17 +1,24 @@
-# Agent Instructions
+## Terminal Commands
 
-## Command Execution
+Use RTK for terminal commands when possible, but only for commands that exist as real executables on Windows.
 
-Use RTK for terminal commands when possible to reduce terminal output and keep command results easier to review.
+Prefer:
 
-Prefer RTK-wrapped commands:
+- `rtk git status`
+- `rtk git diff`
+- `rtk npm run build`
+- `rtk npm run lint`
+- `rtk npx tsc --noEmit`
 
-```bash
-rtk git status
-rtk git diff
-rtk ls
-rtk grep "keyword" .
-rtk npm run build
-rtk npm run lint
-rtk npm run typecheck
-rtk tsc
+Do not use `rtk ls` in Windows PowerShell because `ls` is only a PowerShell alias, not a real executable.
+
+For listing files in PowerShell, use:
+
+- `Get-ChildItem`
+- `dir`
+
+For searching text in PowerShell, use:
+
+- `Select-String`
+
+If RTK fails or is unavailable, fall back to the normal command and explain why.

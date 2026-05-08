@@ -820,9 +820,10 @@ export function Transactions() {
 
   return (
     <>
-<section className="flex flex-col gap-4 px-5 pb-20 pt-5 md:min-h-0 md:px-0 md:pb-0 md:pt-0"> 
-<header className="flex items-start justify-between gap-4 pt-1">          
-  <div>
+      <section className="mx-auto flex h-[calc(100dvh-6rem)] min-h-0 w-full max-w-[430px] flex-col overflow-hidden px-5 pt-5 md:h-auto md:min-h-dvh md:max-w-none md:overflow-visible md:px-0 md:pt-0">
+        <div className="shrink-0 space-y-4">
+          <header className="flex items-start justify-between gap-4 pt-1">
+            <div>
             <p className="text-[11px] font-black uppercase tracking-[0.28em] text-[var(--bc-text-muted)]">
               Ledger
             </p>
@@ -836,13 +837,13 @@ export function Transactions() {
             </p>
           </div>
 
-          <AddTransactionDialog
-  className="bc-button bc-button-primary mt-0.5 h-12 rounded-[20px] px-5 text-sm shadow-[0_12px_26px_var(--bc-green-glow)]"
-  label="Add"
-/>
-        </header>
+            <AddTransactionDialog
+              className="bc-button bc-button-primary mt-0.5 h-12 rounded-[20px] px-5 text-sm shadow-[0_12px_26px_var(--bc-green-glow)]"
+              label="Add"
+            />
+          </header>
 
-        <section className="bc-card p-4">
+          <section className="bc-card p-4">
           <div className="flex items-center justify-between gap-3">
             <div>
               <p className="text-[11px] font-black uppercase tracking-[0.22em] text-[var(--bc-text-muted)]">
@@ -891,43 +892,44 @@ export function Transactions() {
               </p>
             </div>
           </div>
-        </section>
+          </section>
 
-<section className="bc-card relative z-20 overflow-visible rounded-[28px] p-4">
+          <section className="bc-card relative z-20 overflow-visible rounded-[28px] p-4">
             <div className="relative">
-            <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--bc-text-muted)]" />
+              <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--bc-text-muted)]" />
 
-            <input
-              className="bc-input !pl-11 !pr-4 text-left"
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Search transactions"
-              value={search}
-            />
-          </div>
+              <input
+                className="bc-input !pl-11 !pr-4 text-left"
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Search transactions"
+                value={search}
+              />
+            </div>
 
-          <div className="mt-3.5 grid grid-cols-2 gap-3">
-            <TypeFilterDropdown
-              value={typeFilter}
-              onChange={setTypeFilter}
-            />
+            <div className="mt-3.5 grid grid-cols-2 gap-3">
+              <TypeFilterDropdown
+                value={typeFilter}
+                onChange={setTypeFilter}
+              />
 
-            <MonthFilterDropdown
-              value={monthFilter}
-              onChange={setMonthFilter}
-            />
-          </div>
-        </section>
+              <MonthFilterDropdown
+                value={monthFilter}
+                onChange={setMonthFilter}
+              />
+            </div>
+          </section>
+        </div>
 
         <section
-  className={cn(
-    "space-y-3",
-    filteredTransactions.length === 0 && "flex flex-col",
-  )}
->
+          className={cn(
+            "scrollbar-hidden mt-4 min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain pr-1 pb-[calc(4rem+env(safe-area-inset-bottom))] md:overflow-visible md:pb-0",
+            filteredTransactions.length === 0 && "flex flex-col",
+          )}
+        >
           {groupedTransactions.map((group) => (
             <div className="space-y-2" key={group.key}>
-<div className="px-1 pt-1">
-                  <h2 className="text-sm font-black text-[var(--bc-text)]">
+              <div className="px-1 pt-1">
+                <h2 className="text-sm font-black text-[var(--bc-text)]">
                   {group.title}
                 </h2>
 
@@ -949,7 +951,7 @@ export function Transactions() {
           ))}
 
           {filteredTransactions.length === 0 && (
-<div className="bc-card-elevated flex flex-col items-center justify-center px-6 py-8 text-center">
+            <div className="bc-card-elevated flex flex-col items-center justify-center px-6 py-8 text-center">
               <div className="flex h-14 w-14 items-center justify-center rounded-full border border-[var(--bc-border)] bg-[var(--bc-surface-soft)] text-[var(--bc-green)]">
                 <WalletCards className="h-6 w-6" />
               </div>

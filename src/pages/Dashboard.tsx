@@ -642,8 +642,8 @@ function DashboardStatCard({
   return (
     <article className={cn("bc-stat-card p-4", toneClass.card)}>
       <div className="flex items-start justify-between gap-3">
-        <div className={cn("bc-icon-circle h-9 w-9", toneClass.icon)}>
-          <Icon className="h-4.5 w-4.5" strokeWidth={2.4} />
+        <div className={cn("bc-icon-circle h-10 w-10", toneClass.icon)}>
+          <Icon className="h-5 w-5" strokeWidth={2.4} />
         </div>
 
         {trend && (
@@ -971,7 +971,7 @@ const billsSparklinePoints = isYearlyView
     .trim();
 
   return (
-    <div className="mx-auto w-full max-w-[430px] px-5 pb-[35px] pt-5 md:max-w-none md:px-0 md:pb-8 md:pt-0">
+    <div className="mx-auto w-full max-w-[430px] px-5 pb-[30px] pt-5 md:max-w-none md:px-0 md:pb-4 md:pt-0">
       <header className="mb-5 flex items-center justify-between gap-4">
         <div className="min-w-0">
           <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[var(--bc-text-muted)]">
@@ -1645,8 +1645,8 @@ const billsSparklinePoints = isYearlyView
 
           <div className="rounded-[22px] border border-[var(--bc-border)] bg-[var(--bc-surface-soft)]/55 p-4">
             <div className="flex items-start gap-3">
-              <div className="bc-icon-circle bc-icon-circle-green">
-                <Landmark className="h-4.5 w-4.5" />
+              <div className="bc-icon-circle bc-icon-circle-green h-10 w-10">
+                <Landmark className="h-5 w-5" />
               </div>
 
               <div className="min-w-0 flex-1">

@@ -1,9 +1,9 @@
 import { format, getMonth, isValid, parseISO } from "date-fns";
 import { useLiveQuery } from "dexie-react-hooks";
 import {
-  BarChart3,
   CalendarDays,
   CircleDollarSign,
+  ChevronDown,
   CreditCard,
   ListChecks,
   PiggyBank,
@@ -34,6 +34,7 @@ import { getDueDateIcon } from "../lib/iconMap";
 import { db } from "../lib/localDb";
 import { cn, formatCurrency } from "../lib/utils";
 import type { LocalDueDate, LocalTransaction } from "../types/finance";
+import { AnimatedReportsIcon } from "../components/ui/AnimatedNavIcons";
 
 const BASE_REPORT_YEAR = 2026;
 
@@ -681,7 +682,7 @@ export function Reports() {
         </div>
 
         <div className="bc-reports-icon-intro flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-[var(--bc-border)] bg-[var(--bc-card)] text-[var(--bc-green)]">
-          <BarChart3 className="h-5 w-5" strokeWidth={2.4} />
+          <AnimatedReportsIcon active className="h-5 w-5" />
         </div>
       </header>
 
@@ -705,8 +706,9 @@ export function Reports() {
           <label className="relative block">
             <span className="sr-only">Month or yearly report</span>
             <CalendarDays className="pointer-events-none absolute left-3 top-1/2 z-[1] h-4 w-4 -translate-y-1/2 text-[var(--bc-green)]" />
+            <ChevronDown className="pointer-events-none absolute right-3 top-1/2 z-[1] h-4 w-4 -translate-y-1/2 text-[var(--bc-text-muted)]" />
             <select
-              className="bc-input pl-10"
+              className="bc-input min-h-11 appearance-none rounded-2xl border border-[var(--bc-border)] bg-[var(--bc-card)] pl-10 pr-10 text-center text-sm font-black text-[var(--bc-text-soft)] [text-align-last:center]"
               onChange={(event) =>
                 setSelectedReportView(event.target.value as ReportView)
               }

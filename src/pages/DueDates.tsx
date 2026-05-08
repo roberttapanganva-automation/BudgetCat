@@ -20,6 +20,7 @@ import {
 import { type FormEvent, useEffect, useMemo, useState } from "react";
 
 import { AddDueDateDialog } from "../components/due-dates/AddDueDateDialog";
+import { AnimatedIcon } from "../components/ui/AnimatedIcon";
 import { AnimatedStatusIcon } from "../components/ui/AnimatedStatusIcon";
 import { Modal } from "../components/ui/Modal";
 import { useAuth } from "../contexts/AuthContext";
@@ -351,7 +352,9 @@ function BillRow({
           onClick={() => onMarkPaid(bill)}
           type="button"
         >
-          <CheckCircle2 className="h-4 w-4" />
+          <AnimatedIcon variant="success">
+            <CheckCircle2 className="h-4 w-4" />
+          </AnimatedIcon>
           {bill.status === "paid" ? "Mark Unpaid" : "Mark Paid"}
         </button>
       </div>
@@ -387,7 +390,7 @@ export function DueDates() {
   );
 
   const billBuckets = useMemo(() => {
-    return dueDates.reduce<Record<BillTab, LocalDueDate[]>>(
+    const grouped = dueDates.reduce<Record<BillTab, LocalDueDate[]>>(
       (groups, bill) => {
         const statusBucket = getBillStatusBucket(bill);
         groups[statusBucket].push(bill);
@@ -399,6 +402,28 @@ export function DueDates() {
         overdue: [],
       },
     );
+
+    const upcomingBills = (grouped.upcoming ?? []) as LocalDueDate[];
+    const overdueBills = (grouped.overdue ?? []) as LocalDueDate[];
+    const paidBills = (grouped.paid ?? []) as LocalDueDate[];
+
+    const byDueAsc = (a: LocalDueDate, b: LocalDueDate) => {
+      const aTime = safeDate(a.due_date)?.getTime() ?? Number.MAX_SAFE_INTEGER;
+      const bTime = safeDate(b.due_date)?.getTime() ?? Number.MAX_SAFE_INTEGER;
+      return aTime - bTime;
+    };
+
+    const byPaidDesc = (a: LocalDueDate, b: LocalDueDate) => {
+      const aTime = safeDate(a.updated_at)?.getTime() ?? 0;
+      const bTime = safeDate(b.updated_at)?.getTime() ?? 0;
+      return bTime - aTime;
+    };
+
+    return {
+      upcoming: [...upcomingBills].sort(byDueAsc),
+      overdue: [...overdueBills].sort(byDueAsc),
+      paid: [...paidBills].sort(byPaidDesc),
+    };
   }, [dueDates]);
 
   const visibleBills = billBuckets[activeTab];
@@ -534,7 +559,8 @@ export function DueDates() {
 
   return (
     <>
-      <div className="mx-auto w-full max-w-[430px] px-5 pb-20 pt-5 md:max-w-none md:px-0 md:pb-8 md:pt-0">
+      <div className="mx-auto flex h-[100dvh] min-h-0 w-full max-w-[430px] flex-col overflow-hidden px-5 pt-6 md:h-auto md:min-h-dvh md:max-w-none md:overflow-visible md:px-0 md:pt-0">
+        <div className="shrink-0 space-y-4">
         <header className="mb-5 flex items-center justify-between gap-4">
           <div className="min-w-0">
             <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[var(--bc-text-muted)]">
@@ -649,7 +675,7 @@ export function DueDates() {
           </section>
         )}
 
-        <section className="bc-card mb-4 p-2">
+        <section className="bc-card mb-2 p-2">
           <div className="grid grid-cols-3 gap-1">
             {(["upcoming", "paid", "overdue"] as BillTab[]).map((tab) => (
               <button
@@ -665,7 +691,11 @@ export function DueDates() {
               >
                 {(() => {
                   const Icon = tabIcons[tab];
-                  return <Icon className="h-3.5 w-3.5 shrink-0" />;
+                  return (
+                    <AnimatedIcon variant={tab === "overdue" ? "warning" : "tap"}>
+                      <Icon className="h-3.5 w-3.5 shrink-0" />
+                    </AnimatedIcon>
+                  );
                 })()}
                 {tabLabels[tab]}
                 <span className="ml-1 text-[10px] opacity-70">
@@ -675,8 +705,9 @@ export function DueDates() {
             ))}
           </div>
         </section>
+        </div>
 
-        <section className="space-y-3">
+        <section className="scrollbar-hidden mt-4 min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain pr-1 pb-[calc(4rem+env(safe-area-inset-bottom))] md:overflow-visible md:pb-0">
           {visibleBills.map((bill) => (
             <BillRow
               bill={bill}
@@ -1008,4 +1039,3 @@ function EditDueDateModal({
     </Modal>
   );
 }
-
