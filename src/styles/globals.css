@@ -2,6 +2,38 @@
 @tailwind components;
 @tailwind utilities;
 
+.scrollbar-hidden {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.scrollbar-hidden::-webkit-scrollbar {
+  display: none;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+body {
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+html::-webkit-scrollbar,
+body::-webkit-scrollbar,
+#root::-webkit-scrollbar {
+  display: none;
+}
+
+* {
+  -webkit-overflow-scrolling: touch;
+}
+
 :root,
 [data-theme="light"] {
   color-scheme: light;
@@ -201,10 +233,6 @@ a {
 img,
 svg {
   display: block;
-}
-
-#root {
-  min-height: 100vh;
 }
 
 @layer base {
