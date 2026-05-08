@@ -1,4 +1,4 @@
-import { AlertTriangle, RefreshCcw, RotateCcw, Trash2 } from "lucide-react";
+import { AlertTriangle, RefreshCcw, RotateCcw, Trash2 } from "../../lib/icons";
 import { reloadBudgetCat, emergencyResetBudgetCat, type StartupErrorState } from "../../lib/startupDebug";
 import { Button } from "../ui/Button";
 

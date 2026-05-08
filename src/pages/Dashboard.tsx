@@ -17,7 +17,7 @@ import {
   TrendingUp,
   Wallet,
   type LucideIcon,
-} from "lucide-react";
+} from "../lib/icons";
 import { useLiveQuery } from "dexie-react-hooks";
 import {
   differenceInCalendarDays,
@@ -733,6 +733,7 @@ export function Dashboard() {
   const { user } = useAuth();
   const householdId = user?.householdId ?? "";
   const [nickname, setNickname] = useState(() => getDisplayNickname(user));
+  const [currentTime, setCurrentTime] = useState(() => new Date());
   const [showNotifications, setShowNotifications] = useState(false);
 
   const transactions =
@@ -790,6 +791,14 @@ export function Dashboard() {
 
     return () => window.removeEventListener(nicknameEventName, updateNickname);
   }, [user]);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setCurrentTime(new Date());
+    }, 60_000);
+
+    return () => window.clearInterval(timer);
+  }, []);
 
   const today = useMemo(() => new Date(), []);
   const [selectedMonth, setSelectedMonth] = useState(today.getMonth());
@@ -954,7 +963,7 @@ const billsSparklinePoints = isYearlyView
   const monthLabel = isYearlyView
     ? `${selectedYear} Overview`
     : format(selectedDate, "MMMM yyyy");
-  const greeting = getTimeGreeting(selectedDate);
+  const greeting = getTimeGreeting(currentTime);
 
   const safeToSpend = Math.max(0, summary.remaining);
   const cleanMascotMessage = mascotCheckIn.clyde.message

@@ -1,5 +1,5 @@
 import { formatISO } from "date-fns";
-import { CalendarPlus } from "lucide-react";
+import { CalendarPlus } from "../../lib/icons";
 import { type FormEvent, useState } from "react";
 import { useAuth } from "../../contexts/AuthContext";
 import { useToast } from "../../hooks/useToast";

@@ -16,7 +16,7 @@ import {
   Trash2,
   Trophy,
   Wallet,
-} from "lucide-react";
+} from "../lib/icons";
 import { type FormEvent, useEffect, useMemo, useState } from "react";
 
 import { AddGoalDialog } from "../components/goals/AddGoalDialog";

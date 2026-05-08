@@ -1,5 +1,5 @@
 import { type MouseEvent, type ReactNode, useEffect } from "react";
-import { X } from "lucide-react";
+import { X } from "../../lib/icons";
 
 import { cn } from "../../lib/utils";
 import { Button } from "./Button";

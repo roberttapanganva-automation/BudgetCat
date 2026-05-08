@@ -5,7 +5,7 @@ import {
   Plus,
   WalletCards,
   type LucideIcon,
-} from "lucide-react";
+} from "../../lib/icons";
 
 import { NavLink } from "react-router-dom";
 

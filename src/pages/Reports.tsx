@@ -13,7 +13,7 @@ import {
   TrendingUp,
   Wallet,
   type LucideIcon,
-} from "lucide-react";
+} from "../lib/icons";
 import { useMemo, useState } from "react";
 import {
   Bar,

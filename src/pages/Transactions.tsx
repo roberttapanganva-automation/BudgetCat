@@ -28,7 +28,7 @@ import {
   TrendingUp,
   WalletCards,
   type LucideIcon,
-} from "lucide-react";
+} from "../lib/icons";
 import { type FormEvent, useEffect, useMemo, useState } from "react";
 
 import { AddTransactionDialog } from "../components/transactions/AddTransactionDialog";
@@ -162,6 +162,22 @@ function formatTransactionDate(
   if (!parsedDate) return "No date";
 
   return format(parsedDate, dateFormat);
+}
+
+function getTransactionDisplayNote(transaction: LocalTransaction) {
+  const note = safeText(transaction.note).trim();
+
+  if (!note) return "";
+
+  const autoBillMatch = /^Auto-created from bill payment - Paid bill:\s*(.+?)\s*\[bill:[^\]]+\]\s*$/i.exec(
+    note,
+  );
+
+  if (autoBillMatch?.[1]) {
+    return autoBillMatch[1].trim();
+  }
+
+  return note;
 }
 
 function getCategoryTypeForTransaction(type: TransactionType) {
@@ -653,9 +669,9 @@ className="group flex w-full items-center gap-3.5 rounded-[22px] border border-[
           {formatTransactionDate(transaction.date, "MMM d, yyyy")}
         </p>
 
-        {transaction.note ? (
+        {getTransactionDisplayNote(transaction) ? (
           <p className="mt-1 line-clamp-1 text-[11px] font-medium text-[var(--bc-text-muted)]">
-            {transaction.note}
+            {getTransactionDisplayNote(transaction)}
           </p>
         ) : null}
       </div>

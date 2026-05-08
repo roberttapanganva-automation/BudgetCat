@@ -8,7 +8,7 @@ import {
   RefreshCw,
   Settings,
   Target,
-} from "lucide-react";
+} from "../../lib/icons";
 import { useLiveQuery } from "dexie-react-hooks";
 import { NavLink } from "react-router-dom";
 

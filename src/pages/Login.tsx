@@ -8,7 +8,7 @@ import {
   UserPlus,
   WalletCards,
   WifiOff,
-} from "lucide-react";
+} from "../lib/icons";
 import { type FormEvent, useState } from "react";
 
 import { ThemeToggle } from "../components/layout/ThemeToggle";
@@ -150,10 +150,10 @@ export function Login() {
           </div>
 
           <div className="relative z-10 my-8 flex flex-1 flex-col justify-center">
-            <div className="mx-auto flex w-full max-w-sm justify-center">
+            <div className="mx-auto flex w-full max-w-[420px] justify-center">
               <BudgetCatMascot
-                className="h-44 w-64 md:h-56 md:w-80"
-                imageClassName="h-full w-full object-contain drop-shadow-2xl"
+                className="h-56 w-full md:h-72"
+                imageClassName="h-full w-full max-w-none object-contain object-center"
                 variant="both"
               />
             </div>
@@ -381,8 +381,12 @@ export function Login() {
 
               <div className="mt-5 rounded-[22px] border border-[var(--bc-border)] bg-[var(--bc-surface-soft)]/60 p-4">
                 <div className="flex items-start gap-3">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[var(--bc-border)] bg-[var(--bc-card)] text-lg">
-                    🐾
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[var(--bc-border)] bg-[var(--bc-card)]">
+                    <BudgetCatMascot
+                      className="h-8 w-8"
+                      imageClassName="h-full w-full max-w-none object-contain object-center"
+                      variant="both"
+                    />
                   </div>
 
                   <div>
