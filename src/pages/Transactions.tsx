@@ -820,7 +820,7 @@ export function Transactions() {
 
   return (
     <>
-      <section className="mx-auto flex h-[calc(100dvh-6rem)] min-h-0 w-full max-w-[430px] flex-col overflow-hidden px-5 pt-5 md:h-auto md:min-h-dvh md:max-w-none md:overflow-visible md:px-0 md:pt-0">
+      <section className="mx-auto flex h-[100dvh] min-h-0 w-full max-w-[430px] flex-col overflow-hidden px-5 pt-5 md:h-auto md:min-h-dvh md:max-w-none md:overflow-visible md:px-0 md:pt-0">
         <div className="shrink-0 space-y-4">
           <header className="flex items-start justify-between gap-4 pt-1">
             <div>
@@ -922,7 +922,7 @@ export function Transactions() {
 
         <section
           className={cn(
-            "scrollbar-hidden mt-4 min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain pr-1 pb-[calc(4rem+env(safe-area-inset-bottom))] md:overflow-visible md:pb-0",
+            "scrollbar-hidden mt-4 min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain pr-1 pb-[calc(3.25rem+env(safe-area-inset-bottom))] md:overflow-visible md:pb-0",
             filteredTransactions.length === 0 && "flex flex-col",
           )}
         >

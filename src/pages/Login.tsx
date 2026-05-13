@@ -146,7 +146,6 @@ export function Login() {
               </div>
             </div>
 
-            <ThemeToggle className="h-11 w-11 rounded-2xl border border-[var(--bc-border)] bg-[var(--bc-surface-soft)] text-[var(--bc-text)]" />
           </div>
 
           <div className="relative z-10 my-8 flex flex-1 flex-col justify-center">
@@ -234,15 +233,7 @@ export function Login() {
             </div>
 
             <article className="bc-card-elevated overflow-hidden p-5 md:p-6">
-              <div className="mb-5 text-center">
-                <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-[24px] border border-[var(--bc-border)] bg-[var(--bc-green-glow)] md:hidden">
-                  <BudgetCatMascot
-                    className="h-14 w-14"
-                    imageClassName="h-full w-full object-contain"
-                    variant="both"
-                  />
-                </div>
-
+              <div className="mb-4 text-center">
                 <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[var(--bc-text-muted)]">
                   {mode === "signup" ? "Create account" : "Welcome back"}
                 </p>
@@ -331,7 +322,7 @@ export function Login() {
                     <Mail className="pointer-events-none absolute left-4 top-1/2 h-4.5 w-4.5 -translate-y-1/2 text-[var(--bc-text-muted)]" />
                     <input
                       autoComplete="email"
-                      className="bc-input min-h-[54px] pl-12"
+                      className="bc-input min-h-[54px] pl-14"
                       name="email"
                       placeholder="you@example.com"
                       required
@@ -351,7 +342,7 @@ export function Login() {
                       autoComplete={
                         mode === "signup" ? "new-password" : "current-password"
                       }
-                      className="bc-input min-h-[54px] pl-12"
+                      className="bc-input min-h-[54px] pl-14"
                       minLength={6}
                       name="password"
                       placeholder="••••••••"

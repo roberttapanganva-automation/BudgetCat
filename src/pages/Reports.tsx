@@ -1,6 +1,7 @@
 import { format, getMonth, isValid, parseISO } from "date-fns";
 import { useLiveQuery } from "dexie-react-hooks";
 import {
+  Check,
   CalendarDays,
   CircleDollarSign,
   ChevronDown,
@@ -71,6 +72,12 @@ type TrendRow = {
   bills: number;
   savings: number;
   net: number;
+};
+
+type ReportSelectOption<T extends string | number> = {
+  value: T;
+  label: string;
+  shortLabel?: string;
 };
 
 const monthOptions = Array.from({ length: 12 }, (_, monthIndex) => ({
@@ -562,6 +569,89 @@ function BillList({ bills }: { bills: ReportBill[] }) {
   );
 }
 
+function ReportPeriodDropdown<T extends string | number>({
+  value,
+  options,
+  onChange,
+  icon: Icon = CalendarDays,
+}: {
+  value: T;
+  options: Array<ReportSelectOption<T>>;
+  onChange: (value: T) => void;
+  icon?: LucideIcon;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+
+  const selectedOption = options.find((option) => option.value === value) ?? options[0];
+
+  return (
+    <div
+      className="relative"
+      onBlur={(event) => {
+        const nextTarget = event.relatedTarget as Node | null;
+        if (!nextTarget || !event.currentTarget.contains(nextTarget)) {
+          setIsOpen(false);
+        }
+      }}
+    >
+      <button
+        aria-expanded={isOpen}
+        aria-haspopup="listbox"
+        className="bc-input flex h-11 w-full items-center gap-2 !px-3 text-left"
+        onClick={() => setIsOpen((current) => !current)}
+        type="button"
+      >
+        <Icon className="h-4 w-4 shrink-0 text-[var(--bc-green)]" />
+        <span className="min-w-0 flex-1 truncate text-center text-sm font-black text-[var(--bc-text-soft)]">
+          {selectedOption?.shortLabel ?? selectedOption?.label}
+        </span>
+        <ChevronDown
+          className={cn(
+            "h-4 w-4 shrink-0 text-[var(--bc-text-muted)] transition-transform",
+            isOpen ? "rotate-180" : "rotate-0",
+          )}
+        />
+      </button>
+
+      {isOpen ? (
+        <div
+          className="absolute left-0 top-[calc(100%+0.5rem)] z-50 max-h-72 w-full overflow-y-auto rounded-2xl border border-[var(--bc-border-strong)] bg-[var(--bc-bg-deep)] p-1.5 shadow-[0_18px_42px_rgba(0,0,0,0.42)]"
+          role="listbox"
+        >
+          {options.map((option) => {
+            const isSelected = option.value === value;
+
+            return (
+              <button
+                aria-selected={isSelected}
+                className={cn(
+                  "flex w-full items-center gap-2 rounded-xl px-2.5 py-2 text-left text-sm font-black transition",
+                  isSelected
+                    ? "bg-[var(--bc-green-glow)] text-[var(--bc-green)]"
+                    : "text-[var(--bc-text-soft)] hover:bg-[var(--bc-surface-soft)] hover:text-[var(--bc-text)]",
+                )}
+                key={String(option.value)}
+                onClick={() => {
+                  onChange(option.value);
+                  setIsOpen(false);
+                }}
+                role="option"
+                type="button"
+              >
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-[var(--bc-border)] bg-[var(--bc-surface)]">
+                  <Icon className="h-4 w-4 text-[var(--bc-green)]" />
+                </span>
+                <span className="min-w-0 flex-1 truncate">{option.label}</span>
+                {isSelected ? <Check className="h-4 w-4 shrink-0" /> : null}
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 export function Reports() {
   const { user } = useAuth();
   const householdId = user?.householdId ?? "";
@@ -703,40 +793,35 @@ export function Reports() {
         </div>
 
         <div className="mt-4 grid grid-cols-[1fr_0.72fr] gap-3">
-          <label className="relative block">
+          <div>
             <span className="sr-only">Month or yearly report</span>
-            <CalendarDays className="pointer-events-none absolute left-3 top-1/2 z-[1] h-4 w-4 -translate-y-1/2 text-[var(--bc-green)]" />
-            <ChevronDown className="pointer-events-none absolute right-3 top-1/2 z-[1] h-4 w-4 -translate-y-1/2 text-[var(--bc-text-muted)]" />
-            <select
-              className="bc-input min-h-11 appearance-none rounded-2xl border border-[var(--bc-border)] bg-[var(--bc-card)] pl-10 pr-10 text-center text-sm font-black text-[var(--bc-text-soft)] [text-align-last:center]"
-              onChange={(event) =>
-                setSelectedReportView(event.target.value as ReportView)
-              }
+            <ReportPeriodDropdown
+              icon={CalendarDays}
+              onChange={(value) => setSelectedReportView(value)}
+              options={[
+                { value: "yearly", label: "Yearly", shortLabel: "Yearly" },
+                ...monthOptions.map((month) => ({
+                  value: month.value as ReportView,
+                  label: month.label,
+                  shortLabel: month.shortLabel,
+                })),
+              ]}
               value={selectedReportView}
-            >
-              <option value="yearly">Yearly</option>
-              {monthOptions.map((month) => (
-                <option key={month.value} value={month.value}>
-                  {month.label}
-                </option>
-              ))}
-            </select>
-          </label>
+            />
+          </div>
 
-          <label className="block">
+          <div>
             <span className="sr-only">Report year</span>
-            <select
-              className="bc-input"
-              onChange={(event) => setSelectedYear(Number(event.target.value))}
+            <ReportPeriodDropdown
+              icon={CalendarDays}
+              onChange={(value) => setSelectedYear(Number(value))}
+              options={reportYearOptions.map((year) => ({
+                value: year,
+                label: String(year),
+              }))}
               value={selectedYear}
-            >
-              {reportYearOptions.map((year) => (
-                <option key={year} value={year}>
-                  {year}
-                </option>
-              ))}
-            </select>
-          </label>
+            />
+          </div>
         </div>
       </section>
 
