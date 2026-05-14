@@ -767,7 +767,7 @@ export function Reports() {
             Reports
           </h1>
           <p className="mt-1 text-sm font-semibold text-[var(--bc-text-muted)]">
-            Insights for better decisions
+            Review income, expenses, savings, and trends.
           </p>
         </div>
 
@@ -784,10 +784,10 @@ export function Reports() {
 
           <div className="min-w-0 flex-1">
             <p className="text-sm font-black text-[var(--bc-text)]">
-              Report period
+              Report view
             </p>
             <p className="mt-1 text-xs font-semibold text-[var(--bc-text-muted)]">
-              Default is this month. Switch to yearly when you want the full view.
+              Pick a month or view the full year.
             </p>
           </div>
         </div>

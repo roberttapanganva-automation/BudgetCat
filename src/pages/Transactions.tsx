@@ -31,7 +31,7 @@ import {
 } from "../lib/icons";
 import { type FormEvent, useEffect, useMemo, useState } from "react";
 
-import { AddTransactionDialog } from "../components/transactions/AddTransactionDialog";
+import { BudgetHealthBattery } from "../components/ui/BudgetHealthBattery";
 import { AnimatedStatusIcon } from "../components/ui/AnimatedStatusIcon";
 import { Button } from "../components/ui/Button";
 import { Modal } from "../components/ui/Modal";
@@ -138,6 +138,20 @@ const filterTypeLabels: Record<TransactionFilter, string> =
   );
 
 const MONTH_INDEXES = Array.from({ length: 12 }, (_, index) => index);
+
+function formatMobileSummaryCurrency(amount: number) {
+  const absoluteAmount = Math.abs(amount);
+
+  if (absoluteAmount < 1_000_000) {
+    return formatCurrency(amount);
+  }
+
+  const compactValue = amount / 1_000_000;
+  const fixedDigits = Math.abs(compactValue) >= 10 ? 0 : 1;
+  const displayValue = Number(compactValue.toFixed(fixedDigits));
+
+  return `₱${displayValue}M`;
+}
 
 function safeText(value: unknown) {
   return typeof value === "string" ? value : "";
@@ -818,12 +832,54 @@ export function Transactions() {
     );
   }, [filteredTransactions]);
 
+  const budgetHealthPercent = useMemo(() => {
+    const monthInterval = getMonthInterval(monthFilter);
+
+    const scopedTransactions = transactions.filter((transaction) => {
+      if (!monthInterval) return true;
+      const parsedDate = safeDate(transaction.date);
+      return parsedDate ? isWithinInterval(parsedDate, monthInterval) : false;
+    });
+
+    const scoped = scopedTransactions.reduce(
+      (summary, transaction) => {
+        const amount = Number(transaction.amount || 0);
+
+        if (transaction.type === "income" || transaction.type === "salary") {
+          summary.income += amount;
+          return summary;
+        }
+
+        if (
+          transaction.type === "savings" ||
+          transaction.type === "goal_contribution"
+        ) {
+          summary.savings += amount;
+          return summary;
+        }
+
+        if (transaction.type === "expense") {
+          summary.expenses += amount;
+        }
+
+        return summary;
+      },
+      { income: 0, expenses: 0, savings: 0 },
+    );
+
+    const remaining = scoped.income - scoped.expenses - scoped.savings;
+
+    return scoped.income > 0
+      ? Math.max(0, Math.min(100, Math.round((remaining / scoped.income) * 100)))
+      : 0;
+  }, [monthFilter, transactions]);
+
   return (
     <>
       <section className="mx-auto flex h-[100dvh] min-h-0 w-full max-w-[430px] flex-col overflow-hidden px-5 pt-5 md:h-auto md:min-h-dvh md:max-w-none md:overflow-visible md:px-0 md:pt-0">
         <div className="shrink-0 space-y-4">
           <header className="flex items-start justify-between gap-4 pt-1">
-            <div>
+            <div className="min-w-0">
             <p className="text-[11px] font-black uppercase tracking-[0.28em] text-[var(--bc-text-muted)]">
               Ledger
             </p>
@@ -832,14 +888,15 @@ export function Transactions() {
               Transactions
             </h1>
 
-            <p className="mt-1 text-sm font-semibold text-[var(--bc-text-soft)]">
-              Your entries are saved instantly
+            <p className="mt-1 text-xs font-semibold text-[var(--bc-text-muted)]">
+              Track expenses, income, savings, and goals.
             </p>
           </div>
 
-            <AddTransactionDialog
-              className="bc-button bc-button-primary mt-0.5 h-12 rounded-[20px] px-5 text-sm shadow-[0_12px_26px_var(--bc-green-glow)]"
-              label="Add"
+            <BudgetHealthBattery
+              className="items-end pt-0.5"
+              label="Budget status"
+              percent={budgetHealthPercent}
             />
           </header>
 
@@ -862,35 +919,50 @@ export function Transactions() {
           </div>
 
           <div className="mt-5 grid grid-cols-3 gap-3">
-            <div className="rounded-2xl border border-[var(--bc-green)]/20 bg-[var(--bc-green-glow)] p-4">
-              <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[var(--bc-text-muted)]">
-                Income
-              </p>
+              <div className="rounded-2xl border border-[var(--bc-green)]/20 bg-[var(--bc-green-glow)] p-4">
+                <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[var(--bc-text-muted)]">
+                  Income
+                </p>
 
-              <p className="mt-1 truncate text-sm font-black text-[var(--bc-green)]">
-                {formatCurrency(totals.income)}
-              </p>
-            </div>
+                <p className="mt-1 truncate text-sm font-black text-[var(--bc-green)]">
+                  <span className="sm:hidden">
+                    {formatMobileSummaryCurrency(totals.income)}
+                  </span>
+                  <span className="hidden sm:inline">
+                    {formatCurrency(totals.income)}
+                  </span>
+                </p>
+              </div>
 
-            <div className="rounded-2xl border border-[var(--bc-red)]/20 bg-[var(--bc-red-glow)] p-4">
-              <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[var(--bc-text-muted)]">
-                Expenses
-              </p>
+              <div className="rounded-2xl border border-[var(--bc-red)]/20 bg-[var(--bc-red-glow)] p-4">
+                <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[var(--bc-text-muted)]">
+                  Expenses
+                </p>
 
-              <p className="mt-1 truncate text-sm font-black text-[var(--bc-red)]">
-                {formatCurrency(totals.expenses)}
-              </p>
-            </div>
+                <p className="mt-1 truncate text-sm font-black text-[var(--bc-red)]">
+                  <span className="sm:hidden">
+                    {formatMobileSummaryCurrency(totals.expenses)}
+                  </span>
+                  <span className="hidden sm:inline">
+                    {formatCurrency(totals.expenses)}
+                  </span>
+                </p>
+              </div>
 
-            <div className="rounded-2xl border border-[var(--bc-blue)]/20 bg-[var(--bc-blue)]/10 p-4">
-              <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[var(--bc-text-muted)]">
-                Savings
-              </p>
+              <div className="rounded-2xl border border-[var(--bc-blue)]/20 bg-[var(--bc-blue)]/10 p-4">
+                <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[var(--bc-text-muted)]">
+                  Savings
+                </p>
 
-              <p className="mt-1 truncate text-sm font-black text-[var(--bc-blue)]">
-                {formatCurrency(totals.savings)}
-              </p>
-            </div>
+                <p className="mt-1 truncate text-sm font-black text-[var(--bc-blue)]">
+                  <span className="sm:hidden">
+                    {formatMobileSummaryCurrency(totals.savings)}
+                  </span>
+                  <span className="hidden sm:inline">
+                    {formatCurrency(totals.savings)}
+                  </span>
+                </p>
+              </div>
           </div>
           </section>
 
