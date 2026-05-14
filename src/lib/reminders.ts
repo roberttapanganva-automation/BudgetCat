@@ -33,7 +33,7 @@ export function getDueDateReminders(dueDates: LocalDueDate[], referenceDate = ne
           type: "bill",
           status: "overdue",
           title: `${dueDate.title} is overdue`,
-          body: "Mark it paid when handled so BudgetCat can quiet this reminder.",
+          body: `The ${dueDate.title.toLowerCase()} bill is overdue. Mark it paid when handled.`,
           dueDate: dueDate.due_date,
           amount: dueDate.amount,
           severity: "urgent",

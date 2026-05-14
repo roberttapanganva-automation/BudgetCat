@@ -72,6 +72,8 @@ const dashboardPeriodOptions: Array<{
   },
 ];
 
+const readNotificationsStorageKey = "budgetcat-read-notification-ids";
+
 function getTimeGreeting(date = new Date()) {
   const hour = date.getHours();
 
@@ -735,6 +737,21 @@ export function Dashboard() {
   const [nickname, setNickname] = useState(() => getDisplayNickname(user));
   const [currentTime, setCurrentTime] = useState(() => new Date());
   const [showNotifications, setShowNotifications] = useState(false);
+  const [readNotificationIds, setReadNotificationIds] = useState<string[]>(() => {
+    if (typeof window === "undefined") return [];
+
+    try {
+      const storedValue = window.localStorage.getItem(
+        readNotificationsStorageKey,
+      );
+      const parsedValue = storedValue ? JSON.parse(storedValue) : [];
+      return Array.isArray(parsedValue)
+        ? parsedValue.filter((value): value is string => typeof value === "string")
+        : [];
+    } catch {
+      return [];
+    }
+  });
 
   const transactions =
     useLiveQuery(
@@ -915,6 +932,21 @@ const billsSparklinePoints = isYearlyView
   const upcomingBills = getDashboardUpcomingBills(dueDates, 3);
   const reminders = getAllReminders(dueDates, goals, transactions);
 
+  useEffect(() => {
+    setReadNotificationIds((current) =>
+      current.filter((id) => reminders.some((reminder) => reminder.id === id)),
+    );
+  }, [reminders]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    window.localStorage.setItem(
+      readNotificationsStorageKey,
+      JSON.stringify(readNotificationIds),
+    );
+  }, [readNotificationIds]);
+
   const mascotCheckIn = getDashboardMascotCheckIn({
     dueDates,
     goals,
@@ -966,9 +998,25 @@ const billsSparklinePoints = isYearlyView
   const greeting = getTimeGreeting(currentTime);
 
   const safeToSpend = Math.max(0, summary.remaining);
+  const unreadReminderIds = useMemo(
+    () =>
+      reminders
+        .map((reminder) => reminder.id)
+        .filter((id) => !readNotificationIds.includes(id)),
+    [readNotificationIds, reminders],
+  );
+  const unreadReminderCount = unreadReminderIds.length;
   const cleanMascotMessage = mascotCheckIn.clyde.message
     .replace(/\s*(🔄|🔁|↻)\s*$/u, "")
     .trim();
+
+  function toggleAllNotificationsRead() {
+    setReadNotificationIds((current) =>
+      unreadReminderCount > 0
+        ? reminders.map((reminder) => reminder.id)
+        : current.filter((id) => !reminders.some((reminder) => reminder.id === id)),
+    );
+  }
 
   return (
     <div className="mx-auto w-full max-w-[430px] px-5 pb-[30px] pt-5 md:max-w-none md:px-0 md:pb-4 md:pt-0">
@@ -977,7 +1025,7 @@ const billsSparklinePoints = isYearlyView
           <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[var(--bc-text-muted)]">
             {monthLabel}
           </p>
-          <h1 className="mt-1 truncate text-xl font-black tracking-[-0.04em] text-[var(--bc-text)] md:text-3xl">
+          <h1 className="mt-1 truncate text-lg font-black tracking-[-0.04em] text-[var(--bc-text)] sm:text-[1.7rem] md:text-3xl">
             {greeting}, {nickname}!{" "}
             <span aria-hidden="true" className="bc-wave-emoji">
               {"\u{1F44B}"}
@@ -991,22 +1039,25 @@ const billsSparklinePoints = isYearlyView
           <button
             aria-expanded={showNotifications}
             aria-label="Notifications"
-            className={cn(
-              "relative flex h-10 w-10 items-center justify-center rounded-2xl border border-[var(--bc-border)] bg-[var(--bc-card)] text-[var(--bc-text)]",
-              (showNotifications || reminders.length > 0) && "bc-bell-active",
-            )}
+            className="relative flex h-10 w-10 items-center justify-center rounded-2xl border border-[var(--bc-border)] bg-[var(--bc-card)] text-[var(--bc-text)]"
             onClick={() => setShowNotifications((current) => !current)}
             type="button"
           >
-            <Bell className="h-4.5 w-4.5" strokeWidth={2.4} />
-            {reminders.length > 0 && (
+            <Bell
+              className={cn(
+                "h-4.5 w-4.5",
+                unreadReminderCount > 0 && "bc-bell-active",
+              )}
+              strokeWidth={2.4}
+            />
+            {unreadReminderCount > 0 && (
               <span className="bc-notification-dot-pulse absolute right-2 top-2 h-2.5 w-2.5 rounded-full border-2 border-[var(--bc-card)] bg-[var(--bc-red)]" />
             )}
           </button>
 
           <Link
             aria-label="Settings"
-            className="hidden h-10 w-10 items-center justify-center rounded-2xl border border-[var(--bc-border)] bg-[var(--bc-card)] text-[var(--bc-text)] md:flex"
+            className="flex h-10 w-10 items-center justify-center rounded-2xl border border-[var(--bc-border)] bg-[var(--bc-card)] text-[var(--bc-text)]"
             to="/settings"
           >
             <Settings className="h-4.5 w-4.5" strokeWidth={2.4} />
@@ -1024,34 +1075,57 @@ const billsSparklinePoints = isYearlyView
               className="bc-card mx-auto w-full max-w-[430px] p-4"
               onClick={(event) => event.stopPropagation()}
             >
-              <div className="mb-3 flex items-center justify-between gap-3">
-                <div>
+              <div className="mb-3 flex items-start justify-between gap-4">
+                <div className="min-w-0 flex-1 pr-1">
                   <h2 className="text-base font-black text-[var(--bc-text)]">
                     Notifications
                   </h2>
-                  <p className="mt-1 text-xs font-semibold text-[var(--bc-text-muted)]">
-                    Bills, goals, and sync reminders from your real BudgetCat data.
+                  <p className="mt-1 text-[11px] font-semibold leading-[1.35] text-[var(--bc-text-muted)]">
+                    Stay ahead of bills, goals, and sync updates.
                   </p>
                 </div>
 
-                <button
-                  className="rounded-full border border-[var(--bc-red)]/30 bg-[var(--bc-red-glow)] px-3 py-1 text-xs font-black text-[var(--bc-red)] hover:bg-[var(--bc-red)] hover:text-white"
-                  onClick={() => setShowNotifications(false)}
-                  type="button"
-                >
-                  Close
-                </button>
+                <div className="-mt-2 flex shrink-0 flex-col items-end gap-1">
+                  <button
+                    className="rounded-full border border-[var(--bc-red)]/30 bg-[var(--bc-red-glow)] px-3 py-1 text-xs font-black text-[var(--bc-red)] hover:bg-[var(--bc-red)] hover:text-white"
+                    onClick={() => setShowNotifications(false)}
+                    type="button"
+                  >
+                    Close
+                  </button>
+                  {reminders.length > 0 && (
+                    <button
+                      className={cn(
+                        "rounded-full border px-3 py-1 text-[10px] font-black transition md:mt-0",
+                        unreadReminderCount > 0
+                          ? "border-[var(--bc-green)]/25 bg-[var(--bc-green-glow)] text-[var(--bc-green)]"
+                          : "border-[var(--bc-border)] bg-[var(--bc-card)] text-[var(--bc-text-muted)]",
+                      )}
+                      onClick={toggleAllNotificationsRead}
+                      type="button"
+                    >
+                      {unreadReminderCount > 0 ? "Read all" : "Unread all"}
+                    </button>
+                  )}
+                </div>
               </div>
 
               <div className="space-y-2">
                 {reminders.slice(0, 4).map((reminder) => (
-                  <div
-                    className="flex items-start gap-3 rounded-[18px] border border-[var(--bc-border)] bg-[var(--bc-surface-soft)]/60 p-3"
-                    key={reminder.id}
-                  >
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[var(--bc-border)] bg-[var(--bc-card)] text-lg">
-                      {reminder.icon || "🔔"}
-                    </div>
+                    <div
+                      className="flex items-start gap-3 rounded-[18px] border border-[var(--bc-border)] bg-[var(--bc-surface-soft)]/60 p-3"
+                      key={reminder.id}
+                    >
+                      <div className="flex w-11 shrink-0 flex-col items-center gap-1 pt-0.5">
+                        <p className="text-[9px] font-black uppercase tracking-[0.08em] text-[var(--bc-text-muted)]">
+                          {reminder.dueDate
+                            ? formatDate(reminder.dueDate, "MMM d")
+                            : "Today"}
+                        </p>
+                        <div className="flex h-11 w-11 items-center justify-center overflow-visible rounded-full border border-[var(--bc-border)] bg-[var(--bc-card)] text-[1.2rem] leading-none">
+                          {reminder.icon || "🔔"}
+                        </div>
+                      </div>
 
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-black text-[var(--bc-text)]">
@@ -1079,23 +1153,39 @@ const billsSparklinePoints = isYearlyView
           </div>
 
           <section className="bc-card mb-4 hidden p-4 md:block">
-            <div className="mb-3 flex items-center justify-between gap-3">
-              <div>
+            <div className="mb-3 flex items-start justify-between gap-4">
+              <div className="min-w-0 flex-1 pr-1">
                 <h2 className="text-base font-black text-[var(--bc-text)]">
                   Notifications
                 </h2>
-                <p className="mt-1 text-xs font-semibold text-[var(--bc-text-muted)]">
-                  Bills, goals, and sync reminders from your real BudgetCat data.
+                <p className="mt-1 max-w-[260px] text-xs font-semibold leading-relaxed text-[var(--bc-text-muted)]">
+                  Stay ahead of bills, goals, and sync updates.
                 </p>
               </div>
 
-              <button
-                className="rounded-full border border-[var(--bc-red)]/30 bg-[var(--bc-red-glow)] px-3 py-1 text-xs font-black text-[var(--bc-red)] hover:bg-[var(--bc-red)] hover:text-white"
-                onClick={() => setShowNotifications(false)}
-                type="button"
-              >
-                Close
-              </button>
+              <div className="flex shrink-0 flex-col items-end gap-2">
+                <button
+                  className="rounded-full border border-[var(--bc-red)]/30 bg-[var(--bc-red-glow)] px-3 py-1 text-xs font-black text-[var(--bc-red)] hover:bg-[var(--bc-red)] hover:text-white"
+                  onClick={() => setShowNotifications(false)}
+                  type="button"
+                >
+                  Close
+                </button>
+                {reminders.length > 0 && (
+                  <button
+                    className={cn(
+                      "rounded-full border px-3 py-1 text-[10px] font-black transition",
+                      unreadReminderCount > 0
+                        ? "border-[var(--bc-green)]/25 bg-[var(--bc-green-glow)] text-[var(--bc-green)]"
+                        : "border-[var(--bc-border)] bg-[var(--bc-card)] text-[var(--bc-text-muted)]",
+                    )}
+                    onClick={toggleAllNotificationsRead}
+                    type="button"
+                  >
+                    {unreadReminderCount > 0 ? "Read all" : "Unread all"}
+                  </button>
+                )}
+              </div>
             </div>
 
             <div className="space-y-2">
@@ -1104,8 +1194,15 @@ const billsSparklinePoints = isYearlyView
                   className="flex items-start gap-3 rounded-[18px] border border-[var(--bc-border)] bg-[var(--bc-surface-soft)]/60 p-3"
                   key={reminder.id}
                 >
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[var(--bc-border)] bg-[var(--bc-card)] text-lg">
-                    {reminder.icon || "🔔"}
+                  <div className="flex w-11 shrink-0 flex-col items-center gap-1 pt-0.5">
+                    <p className="text-[9px] font-black uppercase tracking-[0.08em] text-[var(--bc-text-muted)]">
+                      {reminder.dueDate
+                        ? formatDate(reminder.dueDate, "MMM d")
+                        : "Today"}
+                    </p>
+                    <div className="flex h-11 w-11 items-center justify-center overflow-visible rounded-full border border-[var(--bc-border)] bg-[var(--bc-card)] text-[1.2rem] leading-none">
+                      {reminder.icon || "🔔"}
+                    </div>
                   </div>
 
                   <div className="min-w-0 flex-1">
@@ -1157,7 +1254,7 @@ const billsSparklinePoints = isYearlyView
                 <h2 className="mt-5 text-3xl font-black tracking-[-0.06em] text-[var(--bc-text)]">
                   BudgetCat
                 </h2>
-                <p className="mt-1 text-sm font-semibold text-[var(--bc-text-muted)]">
+                <p className="mt-1 text-xs font-semibold text-[var(--bc-text-muted)] sm:text-sm">
                   Smart•Friendly•Focused.
                 </p>
               </div>
@@ -1724,16 +1821,6 @@ const billsSparklinePoints = isYearlyView
         </article>
       </section>
 
-      <div className="mt-3 md:hidden">
-        <Link
-          className="flex min-h-11 items-center justify-center gap-2 rounded-[18px] border border-[var(--bc-border)] bg-[var(--bc-card)] text-sm font-black text-[var(--bc-text-soft)]"
-          to="/settings"
-        >
-          <Settings className="h-4.5 w-4.5 text-[var(--bc-green)]" />
-          Settings
-        </Link>
-      </div>
     </div>
   );
 }
-

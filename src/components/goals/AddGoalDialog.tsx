@@ -212,7 +212,7 @@ export function AddGoalDialog({
               >
                 {goalTypes.map((typeOption) => (
                   <option key={typeOption.value} value={typeOption.value}>
-                    {typeOption.label}
+                    {getGoalTypeEmoji(typeOption.value)} {typeOption.label}
                   </option>
                 ))}
               </select>
@@ -228,12 +228,12 @@ export function AddGoalDialog({
                   Target Amount
                 </span>
 
-                <div className="flex min-h-[72px] items-center rounded-[24px] border border-[var(--bc-border)] bg-[var(--bc-card)] px-4 focus-within:border-[var(--bc-green)]/60 focus-within:ring-4 focus-within:ring-[var(--bc-green-glow)]">
-                  <span className="mr-2 text-2xl font-black tracking-[-0.06em] text-[var(--bc-text-muted)]">
+                <div className="flex min-h-[64px] items-center rounded-[22px] border border-[var(--bc-border)] bg-[var(--bc-card)] px-3.5 focus-within:border-[var(--bc-green)]/60 focus-within:ring-4 focus-within:ring-[var(--bc-green-glow)] sm:min-h-[72px] sm:rounded-[24px] sm:px-4">
+                  <span className="mr-2 text-xl font-black tracking-[-0.04em] text-[var(--bc-text-muted)] sm:text-2xl sm:tracking-[-0.06em]">
                     ₱
                   </span>
                   <input
-                    className="min-w-0 flex-1 border-0 bg-transparent text-3xl font-black tracking-[-0.07em] text-[var(--bc-text)] outline-none placeholder:text-[var(--bc-text-muted)]"
+                    className="min-w-0 flex-1 border-0 bg-transparent text-[2rem] font-black tracking-[-0.05em] text-[var(--bc-text)] outline-none placeholder:text-[var(--bc-text-muted)] sm:text-3xl sm:tracking-[-0.07em]"
                     inputMode="decimal"
                     onChange={(event) => setTargetAmount(event.target.value)}
                     placeholder="0.00"
@@ -249,12 +249,12 @@ export function AddGoalDialog({
                   Current Amount
                 </span>
 
-                <div className="flex min-h-[72px] items-center rounded-[24px] border border-[var(--bc-border)] bg-[var(--bc-card)] px-4 focus-within:border-[var(--bc-blue)]/60 focus-within:ring-4 focus-within:ring-[var(--bc-blue)]/10">
-                  <span className="mr-2 text-2xl font-black tracking-[-0.06em] text-[var(--bc-text-muted)]">
+                <div className="flex min-h-[64px] items-center rounded-[22px] border border-[var(--bc-border)] bg-[var(--bc-card)] px-3.5 focus-within:border-[var(--bc-blue)]/60 focus-within:ring-4 focus-within:ring-[var(--bc-blue)]/10 sm:min-h-[72px] sm:rounded-[24px] sm:px-4">
+                  <span className="mr-2 text-xl font-black tracking-[-0.04em] text-[var(--bc-text-muted)] sm:text-2xl sm:tracking-[-0.06em]">
                     ₱
                   </span>
                   <input
-                    className="min-w-0 flex-1 border-0 bg-transparent text-3xl font-black tracking-[-0.07em] text-[var(--bc-text)] outline-none placeholder:text-[var(--bc-text-muted)]"
+                    className="min-w-0 flex-1 border-0 bg-transparent text-[2rem] font-black tracking-[-0.05em] text-[var(--bc-text)] outline-none placeholder:text-[var(--bc-text-muted)] sm:text-3xl sm:tracking-[-0.07em]"
                     inputMode="decimal"
                     onChange={(event) => setCurrentAmount(event.target.value)}
                     placeholder="0.00"

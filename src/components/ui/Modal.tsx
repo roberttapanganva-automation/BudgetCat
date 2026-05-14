@@ -72,9 +72,9 @@ export function Modal({
 
               <Button
                 aria-label="Close modal"
-                className="h-11 min-h-11 w-11 shrink-0 rounded-2xl p-0"
+                className="h-11 min-h-11 w-11 shrink-0 rounded-2xl border-[var(--bc-red)]/30 bg-[var(--bc-red-glow)] p-0 text-[var(--bc-red)] hover:bg-[var(--bc-red)] hover:text-white"
                 onClick={onClose}
-                variant="secondary"
+                variant="ghost"
               >
                 <X size={18} />
               </Button>
