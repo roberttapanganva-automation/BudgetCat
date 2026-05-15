@@ -30,6 +30,7 @@ import { getDueDateIcon } from "../lib/iconMap";
 import {
   addLocalTransaction,
   db,
+  softDeleteLocalTransaction,
   softDeleteLocalDueDate,
   updateLocalDueDate,
 } from "../lib/localDb";
@@ -266,8 +267,8 @@ function getBillPaymentMarker(billId: string) {
   return `[bill:${billId}]`;
 }
 
-function getBillPaymentNote(billId: string, billTitle: string) {
-  return `Auto-created from bill payment - Paid bill: ${billTitle} ${getBillPaymentMarker(billId)}`;
+function getBillPaymentNote(_billId: string, billTitle: string) {
+  return billTitle;
 }
 
 function BillRow({
@@ -498,7 +499,7 @@ export function DueDates() {
           type: "expense",
           amount: Number(bill.amount || 0),
           category: "fees-charges",
-          date: new Date().toISOString().slice(0, 10),
+          date: format(new Date(), "yyyy-MM-dd"),
           payment_method: "Cash",
           note: getBillPaymentNote(bill.id, bill.title || "Untitled bill"),
         },
@@ -529,12 +530,21 @@ export function DueDates() {
 
   async function toggleBillPaid(bill: LocalDueDate) {
     if (bill.status === "paid") {
+      const linkedTransactionId = await findLinkedBillPaymentTransactionId(bill);
+
+      if (linkedTransactionId) {
+        await softDeleteLocalTransaction(linkedTransactionId);
+      }
+
       await updateLocalDueDate(bill.id, {
         status: "upcoming",
         paid_transaction_id: undefined,
       });
 
       if (user) {
+        if (linkedTransactionId) {
+          requestBackgroundSync(user, "transaction_deleted");
+        }
         requestBackgroundSync(user, "due_date_status_updated");
       }
       return;

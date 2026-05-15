@@ -88,7 +88,7 @@ const mobileTransactionTypes: Array<{
   tone: "expense" | "income" | "savings";
 }> = [
   { label: "Expense", value: "expense", tone: "expense" },
-  { label: "Income/Salary", value: "income", tone: "income" },
+  { label: "Income", value: "income", tone: "income" },
   { label: "Savings", value: "savings", tone: "savings" },
   { label: "Goals", value: "goal_contribution", tone: "savings" },
 ];
@@ -488,7 +488,7 @@ export function AddTransactionDialog({
                                 key={categoryOption.id}
                                 value={categoryOption.id}
                               >
-                                {categoryEmojis[categoryOption.id] ?? "•"}{" "}
+                                {categoryEmojis[categoryOption.id] ?? "ï¿½"}{" "}
                                 {categoryOption.label}
                               </option>
                             ))}
