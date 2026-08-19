@@ -27,6 +27,7 @@ import {
 import { AnimatedStatusIcon } from "../components/ui/AnimatedStatusIcon";
 import { Modal } from "../components/ui/Modal";
 import { useAuth } from "../contexts/AuthContext";
+import { useToast } from "../hooks/useToast";
 import {
   getGoalMonthsLeft,
   getGoalProgress,
@@ -313,24 +314,52 @@ export function Goals() {
     });
   }, [goals]);
 
-  const activeGoals = sortedGoals.filter((goal) => goal.status === "active");
+  const activeGoals = sortedGoals.filter(
+    (goal) => goal.status === "active" && getGoalProgress(goal) < 100,
+  );
   const completedGoals = sortedGoals.filter(
     (goal) => goal.status === "completed" || getGoalProgress(goal) >= 100,
   );
 
   const featuredGoal = activeGoals[0] ?? sortedGoals[0];
 
-  const totalTarget = goals.reduce(
-    (sum, goal) => sum + Number(goal.target_amount || 0),
+  const totalTarget = goals.reduce((sum, goal) => {
+    const targetAmount = Number(goal.target_amount || 0);
+    return (
+      sum +
+      (Number.isFinite(targetAmount) && targetAmount >= 0 ? targetAmount : 0)
+    );
+  }, 0);
+  const totalSaved = goals.reduce((sum, goal) => {
+    const currentAmount = Number(goal.current_amount || 0);
+    return (
+      sum +
+      (Number.isFinite(currentAmount) && currentAmount >= 0
+        ? currentAmount
+        : 0)
+    );
+  }, 0);
+  const totalFundedTowardTargets = goals.reduce((sum, goal) => {
+    const targetAmount = Number(goal.target_amount || 0);
+    const currentAmount = Number(goal.current_amount || 0);
+    const safeTarget =
+      Number.isFinite(targetAmount) && targetAmount >= 0 ? targetAmount : 0;
+    const safeCurrent =
+      Number.isFinite(currentAmount) && currentAmount >= 0 ? currentAmount : 0;
+
+    return sum + Math.min(safeTarget, safeCurrent);
+  }, 0);
+  const totalRemaining = goals.reduce(
+    (sum, goal) => sum + getGoalRemaining(goal),
     0,
   );
-  const totalSaved = goals.reduce(
-    (sum, goal) => sum + Number(goal.current_amount || 0),
-    0,
-  );
-  const totalRemaining = Math.max(0, totalTarget - totalSaved);
   const overallProgress =
-    totalTarget <= 0 ? 0 : Math.min(100, Math.round((totalSaved / totalTarget) * 100));
+    totalTarget <= 0
+      ? 0
+      : Math.min(
+          100,
+          Math.round((totalFundedTowardTargets / totalTarget) * 100),
+        );
 
   const mascotMood = getMascotMood({
     dueDates: [],
@@ -833,8 +862,10 @@ function EditGoalModal({
               </span>
               <input
                 className="bc-input"
+                min="0.01"
                 onChange={(event) => setTargetAmount(event.target.value)}
                 required
+                step="0.01"
                 type="number"
                 value={targetAmount}
               />
@@ -846,7 +877,9 @@ function EditGoalModal({
               </span>
               <input
                 className="bc-input"
+                min="0"
                 onChange={(event) => setCurrentAmount(event.target.value)}
+                step="0.01"
                 type="number"
                 value={currentAmount}
               />
@@ -956,6 +989,7 @@ function ContributionModal({
   onClose: () => void;
   user: BudgetCatUser | null;
 }) {
+  const showToast = useToast();
   const [amount, setAmount] = useState("");
   const [note, setNote] = useState("");
   const [isSaving, setIsSaving] = useState(false);
@@ -979,7 +1013,7 @@ function ContributionModal({
         {
           goal_id: goal.id,
           amount: Number(amount || 0),
-          date: new Date().toISOString().slice(0, 10),
+          date: format(new Date(), "yyyy-MM-dd"),
           note,
         },
         user.id,
@@ -988,7 +1022,18 @@ function ContributionModal({
 
       requestBackgroundSync(user, "goal_contribution_added");
       playCreateSuccessFeedback();
+      showToast({
+        title: "Savings added 🌱",
+        message: `${formatCurrency(Number(amount))} was added to ${goal.title}.`,
+        tone: "success",
+      });
       onClose();
+    } catch {
+      showToast({
+        title: "Contribution not saved",
+        message: "Check the amount and try again. Your goal was not changed.",
+        tone: "error",
+      });
     } finally {
       setIsSaving(false);
     }
@@ -1026,10 +1071,11 @@ function ContributionModal({
             <input
               className="min-w-0 flex-1 border-0 bg-transparent text-4xl font-black tracking-[-0.07em] text-[var(--bc-text)] outline-none placeholder:text-[var(--bc-text-muted)]"
               inputMode="decimal"
-              min="0"
+              min="0.01"
               onChange={(event) => setAmount(event.target.value)}
               placeholder="0.00"
               required
+              step="0.01"
               type="number"
               value={amount}
             />

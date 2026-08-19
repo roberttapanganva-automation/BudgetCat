@@ -36,6 +36,7 @@ import {
   calculateMonthlySummary,
   getGoalMonthsLeft,
   getGoalProgress,
+  mergeGoalContributionsForCalculations,
 } from "../lib/calculations";
 import { getCategoryLabel, normalizeCategory } from "../lib/categoryConfig";
 import { getDashboardUpcomingBills } from "../lib/dueDateFilters";
@@ -84,6 +85,11 @@ function getTimeGreeting(date = new Date()) {
 
 function safeText(value: unknown) {
   return typeof value === "string" ? value : "";
+}
+
+function getSafeAmount(value: unknown) {
+  const amount = Number(value || 0);
+  return Number.isFinite(amount) && amount >= 0 ? amount : 0;
 }
 
 function safeDate(dateString?: string | null) {
@@ -449,7 +455,7 @@ function getMonthlyTransactionSparklinePoints(
     if (!isSelectedMonth) return;
 
     const dayIndex = transactionDate.getDate() - 1;
-    dailyTotals[dayIndex] += transaction.amount;
+    dailyTotals[dayIndex] += getSafeAmount(transaction.amount);
   });
 
   return createPeriodSparklinePoints(dailyTotals, labels);
@@ -479,7 +485,7 @@ function getMonthlyBillSparklinePoints(
     if (!isSelectedMonth) return;
 
     const dayIndex = dueDate.getDate() - 1;
-    dailyTotals[dayIndex] += bill.amount;
+    dailyTotals[dayIndex] += getSafeAmount(bill.amount);
   });
 
   return createPeriodSparklinePoints(dailyTotals, labels);
@@ -504,7 +510,9 @@ function getYearlyTransactionSparklinePoints(
     if (!transactionDate) return;
     if (transactionDate.getFullYear() !== selectedYear) return;
 
-    monthlyTotals[transactionDate.getMonth()] += transaction.amount;
+    monthlyTotals[transactionDate.getMonth()] += getSafeAmount(
+      transaction.amount,
+    );
   });
 
   return createPeriodSparklinePoints(monthlyTotals, labels);
@@ -528,7 +536,7 @@ function getYearlyBillSparklinePoints(
     if (!dueDate) return;
     if (dueDate.getFullYear() !== selectedYear) return;
 
-    monthlyTotals[dueDate.getMonth()] += bill.amount;
+    monthlyTotals[dueDate.getMonth()] += getSafeAmount(bill.amount);
   });
 
   return createPeriodSparklinePoints(monthlyTotals, labels);
@@ -789,6 +797,27 @@ export function Dashboard() {
       [],
     ) ?? [];
 
+  const goalContributions =
+    useLiveQuery(
+      () =>
+        db.goal_contributions
+          .where("household_id")
+          .equals(householdId)
+          .filter((contribution) => !contribution.deleted_at)
+          .toArray(),
+      [householdId],
+      [],
+    ) ?? [];
+
+  const budgetTransactions = useMemo(
+    () =>
+      mergeGoalContributionsForCalculations(
+        transactions,
+        goalContributions,
+      ),
+    [goalContributions, transactions],
+  );
+
   const pendingSyncCount =
     useLiveQuery(
       () =>
@@ -834,17 +863,20 @@ export function Dashboard() {
     [selectedMonth, selectedYear],
   );
 
-  const summary = calculateMonthlySummary(transactions, selectedDate);
-  const previousSummary = calculateMonthlySummary(transactions, previousMonth);
+  const summary = calculateMonthlySummary(budgetTransactions, selectedDate);
+  const previousSummary = calculateMonthlySummary(
+    budgetTransactions,
+    previousMonth,
+  );
 
   const yearlySummary = useMemo(
-    () => getYearlySummary(transactions, selectedDate),
-    [transactions, selectedDate],
+    () => getYearlySummary(budgetTransactions, selectedDate),
+    [budgetTransactions, selectedDate],
   );
 
   const previousYearSummary = useMemo(
-    () => getYearlySummary(transactions, previousYearDate),
-    [transactions, previousYearDate],
+    () => getYearlySummary(budgetTransactions, previousYearDate),
+    [budgetTransactions, previousYearDate],
   );
 
   const currentMonthBills = getMonthlyBills(dueDates, selectedDate);
@@ -853,22 +885,22 @@ export function Dashboard() {
   const previousYearBills = getYearlyBills(dueDates, previousYearDate);
 
   const billsTotal = currentMonthBills.reduce(
-    (sum, bill) => sum + bill.amount,
+    (sum, bill) => sum + getSafeAmount(bill.amount),
     0,
   );
 
   const previousBillsTotal = previousMonthBills.reduce(
-    (sum, bill) => sum + bill.amount,
+    (sum, bill) => sum + getSafeAmount(bill.amount),
     0,
   );
 
   const yearlyBillsTotal = yearlyBills.reduce(
-    (sum, bill) => sum + bill.amount,
+    (sum, bill) => sum + getSafeAmount(bill.amount),
     0,
   );
 
   const previousYearBillsTotal = previousYearBills.reduce(
-    (sum, bill) => sum + bill.amount,
+    (sum, bill) => sum + getSafeAmount(bill.amount),
     0,
   );
 
@@ -883,21 +915,21 @@ export function Dashboard() {
     : previousBillsTotal;
 
  const incomeSparklinePoints = isYearlyView
-  ? getYearlyTransactionSparklinePoints(transactions, selectedDate, "income")
-  : getMonthlyTransactionSparklinePoints(transactions, selectedDate, "income");
+  ? getYearlyTransactionSparklinePoints(budgetTransactions, selectedDate, "income")
+  : getMonthlyTransactionSparklinePoints(budgetTransactions, selectedDate, "income");
 
 const expenseSparklinePoints = isYearlyView
-  ? getYearlyTransactionSparklinePoints(transactions, selectedDate, "expenses")
+  ? getYearlyTransactionSparklinePoints(budgetTransactions, selectedDate, "expenses")
   : getMonthlyTransactionSparklinePoints(
-      transactions,
+      budgetTransactions,
       selectedDate,
       "expenses",
     );
 
 const savingsSparklinePoints = isYearlyView
-  ? getYearlyTransactionSparklinePoints(transactions, selectedDate, "savings")
+  ? getYearlyTransactionSparklinePoints(budgetTransactions, selectedDate, "savings")
   : getMonthlyTransactionSparklinePoints(
-      transactions,
+      budgetTransactions,
       selectedDate,
       "savings",
     );
@@ -930,7 +962,7 @@ const billsSparklinePoints = isYearlyView
   const previewGoals = activeGoals.slice(0, 2);
   const featuredGoal = activeGoals[0];
   const upcomingBills = getDashboardUpcomingBills(dueDates, 3);
-  const reminders = getAllReminders(dueDates, goals, transactions);
+  const reminders = getAllReminders(dueDates, goals, budgetTransactions);
 
   useEffect(() => {
     setReadNotificationIds((current) =>
@@ -955,7 +987,7 @@ const billsSparklinePoints = isYearlyView
     pendingSyncCount,
     remainingMoney: summary.remaining,
     savings: summary.savings,
-    transactions,
+    transactions: budgetTransactions,
   });
 
   const incomeTrend = getTrendLabel(

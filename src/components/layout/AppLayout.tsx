@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { format } from "date-fns";
 import { useLiveQuery } from "dexie-react-hooks";
 import { Outlet, useLocation } from "react-router-dom";
 
@@ -61,9 +62,7 @@ export function AppLayout() {
   useEffect(() => {
     if (!user || dueDates.length === 0) return;
 
-    const notificationKey = `budgetcat-reminders-${new Date()
-      .toISOString()
-      .slice(0, 10)}`;
+    const notificationKey = `budgetcat-reminders-${format(new Date(), "yyyy-MM-dd")}`;
 
     if (sessionStorage.getItem(notificationKey)) return;
 

@@ -17,7 +17,7 @@ import {
   ReceiptText,
   Trash2,
 } from "../lib/icons";
-import { type FormEvent, useEffect, useMemo, useState } from "react";
+import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
 
 import { AddDueDateDialog } from "../components/due-dates/AddDueDateDialog";
 import { AnimatedIcon } from "../components/ui/AnimatedIcon";
@@ -28,9 +28,9 @@ import { useToast } from "../hooks/useToast";
 import { getDueDateStatus } from "../lib/calculations";
 import { getDueDateIcon } from "../lib/iconMap";
 import {
-  addLocalTransaction,
   db,
-  softDeleteLocalTransaction,
+  markLocalDueDatePaidWithTransaction,
+  markLocalDueDateUnpaidWithTransaction,
   softDeleteLocalDueDate,
   updateLocalDueDate,
 } from "../lib/localDb";
@@ -267,16 +267,18 @@ function getBillPaymentMarker(billId: string) {
   return `[bill:${billId}]`;
 }
 
-function getBillPaymentNote(_billId: string, billTitle: string) {
-  return billTitle;
+function getBillPaymentNote(billId: string, billTitle: string) {
+  return `${billTitle} ${getBillPaymentMarker(billId)}`;
 }
 
 function BillRow({
   bill,
+  isProcessing,
   onEdit,
   onMarkPaid,
 }: {
   bill: LocalDueDate;
+  isProcessing: boolean;
   onEdit: (bill: LocalDueDate) => void;
   onMarkPaid: (bill: LocalDueDate) => void;
 }) {
@@ -350,13 +352,27 @@ function BillRow({
               ? "bc-button-secondary"
               : "bc-button-primary",
           )}
+          disabled={isProcessing}
           onClick={() => onMarkPaid(bill)}
           type="button"
         >
-          <AnimatedIcon variant="success">
-            <CheckCircle2 className="h-4 w-4" />
-          </AnimatedIcon>
-          {bill.status === "paid" ? "Mark Unpaid" : "Mark Paid"}
+          {isProcessing ? (
+            <AnimatedStatusIcon
+              animation="spin"
+              className="text-current"
+              icon={Loader2}
+              label="Updating bill status"
+            />
+          ) : (
+            <AnimatedIcon variant="success">
+              <CheckCircle2 className="h-4 w-4" />
+            </AnimatedIcon>
+          )}
+          {isProcessing
+            ? "Updating..."
+            : bill.status === "paid"
+              ? "Mark Unpaid"
+              : "Mark Paid"}
         </button>
       </div>
     </article>
@@ -370,6 +386,8 @@ export function DueDates() {
 
   const [activeTab, setActiveTab] = useState<BillTab>("upcoming");
   const [editingBill, setEditingBill] = useState<LocalDueDate | null>(null);
+  const [processingBillId, setProcessingBillId] = useState<string | null>(null);
+  const processingBillRef = useRef<string | null>(null);
 
   const dueDates =
     useLiveQuery(
@@ -462,6 +480,17 @@ export function DueDates() {
   }
 
   async function markBillPaidWithExpense(bill: LocalDueDate) {
+    const billAmount = Number(bill.amount || 0);
+
+    if (!Number.isFinite(billAmount) || billAmount <= 0) {
+      showToast({
+        title: "Bill amount is required.",
+        message: "Add an amount greater than zero before marking this bill paid.",
+        tone: "error",
+      });
+      return;
+    }
+
     const existingTransactionId = await findLinkedBillPaymentTransactionId(bill);
 
     if (existingTransactionId) {
@@ -494,10 +523,11 @@ export function DueDates() {
     }
 
     try {
-      const createdExpense = await addLocalTransaction(
+      const result = await markLocalDueDatePaidWithTransaction(
+        bill.id,
         {
           type: "expense",
-          amount: Number(bill.amount || 0),
+          amount: billAmount,
           category: "fees-charges",
           date: format(new Date(), "yyyy-MM-dd"),
           payment_method: "Cash",
@@ -507,10 +537,15 @@ export function DueDates() {
         user.householdId,
       );
 
-      await updateLocalDueDate(bill.id, {
-        status: "paid",
-        paid_transaction_id: createdExpense.id,
-      });
+      if (!result.created) {
+        showToast({
+          title: "This bill was already recorded.",
+          message: "Existing bill expense is already linked.",
+          tone: "warning",
+        });
+        requestBackgroundSync(user, "due_date_status_updated");
+        return;
+      }
 
       showToast({
         title: "Bill paid and expense recorded.",
@@ -518,7 +553,7 @@ export function DueDates() {
         tone: "success",
       });
 
-      requestBackgroundSync(user, "due_date_status_updated");
+      requestBackgroundSync(user, "bill_payment_recorded");
     } catch {
       showToast({
         title: "Could not record bill payment.",
@@ -529,28 +564,41 @@ export function DueDates() {
   }
 
   async function toggleBillPaid(bill: LocalDueDate) {
-    if (bill.status === "paid") {
-      const linkedTransactionId = await findLinkedBillPaymentTransactionId(bill);
+    if (processingBillRef.current) return;
 
-      if (linkedTransactionId) {
-        await softDeleteLocalTransaction(linkedTransactionId);
-      }
+    processingBillRef.current = bill.id;
+    setProcessingBillId(bill.id);
 
-      await updateLocalDueDate(bill.id, {
-        status: "upcoming",
-        paid_transaction_id: undefined,
-      });
+    try {
+      if (bill.status === "paid") {
+        const linkedTransactionId = await findLinkedBillPaymentTransactionId(bill);
+        await markLocalDueDateUnpaidWithTransaction(bill.id, linkedTransactionId);
 
-      if (user) {
-        if (linkedTransactionId) {
-          requestBackgroundSync(user, "transaction_deleted");
+        showToast({
+          title: "Bill marked unpaid.",
+          message: linkedTransactionId
+            ? "The linked expense was removed from the ledger."
+            : "No linked ledger expense was found.",
+          tone: "success",
+        });
+
+        if (user) {
+          requestBackgroundSync(user, "bill_payment_reverted");
         }
-        requestBackgroundSync(user, "due_date_status_updated");
+        return;
       }
-      return;
-    }
 
-    await markBillPaidWithExpense(bill);
+      await markBillPaidWithExpense(bill);
+    } catch {
+      showToast({
+        title: "Could not update bill.",
+        message: "Nothing was changed. Please try again.",
+        tone: "error",
+      });
+    } finally {
+      processingBillRef.current = null;
+      setProcessingBillId(null);
+    }
   }
 
   async function deleteBill(bill: LocalDueDate) {
@@ -721,6 +769,7 @@ export function DueDates() {
           {visibleBills.map((bill) => (
             <BillRow
               bill={bill}
+              isProcessing={processingBillId === bill.id}
               key={bill.id}
               onEdit={setEditingBill}
               onMarkPaid={toggleBillPaid}
@@ -924,8 +973,10 @@ function EditDueDateModal({
               </span>
               <input
                 className="bc-input"
+                min="0.01"
                 onChange={(event) => setAmount(event.target.value)}
                 required
+                step="0.01"
                 type="number"
                 value={amount}
               />
@@ -970,6 +1021,7 @@ function EditDueDateModal({
                 className="bc-input"
                 min="0"
                 onChange={(event) => setReminderDays(event.target.value)}
+                step="1"
                 type="number"
                 value={reminderDays}
               />
@@ -981,15 +1033,26 @@ function EditDueDateModal({
               </span>
               <select
                 className="bc-input"
+                disabled={bill.status === "paid"}
                 onChange={(event) =>
                   setStatus(event.target.value as DueDateStatus)
                 }
                 value={status}
               >
-                <option value="upcoming">Upcoming</option>
-                <option value="paid">Paid</option>
-                <option value="overdue">Overdue</option>
+                {bill.status === "paid" ? (
+                  <option value="paid">Paid</option>
+                ) : (
+                  <>
+                    <option value="upcoming">Upcoming</option>
+                    <option value="overdue">Overdue</option>
+                  </>
+                )}
               </select>
+              {bill.status === "paid" ? (
+                <p className="text-[11px] font-semibold text-[var(--bc-text-muted)]">
+                  Use Mark Unpaid on the bill card to reverse its ledger expense.
+                </p>
+              ) : null}
             </label>
           </div>
 
