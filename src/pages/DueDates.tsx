@@ -20,6 +20,7 @@ import {
 import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
 
 import { AddDueDateDialog } from "../components/due-dates/AddDueDateDialog";
+import { BudgetCatMascot } from "../components/mascot/BudgetCatMascot";
 import { AnimatedIcon } from "../components/ui/AnimatedIcon";
 import { AnimatedStatusIcon } from "../components/ui/AnimatedStatusIcon";
 import { Modal } from "../components/ui/Modal";
@@ -617,9 +618,9 @@ export function DueDates() {
 
   return (
     <>
-      <div className="mx-auto flex h-[100dvh] min-h-0 w-full max-w-[430px] flex-col overflow-hidden px-5 pt-6 md:h-auto md:min-h-dvh md:max-w-none md:overflow-visible md:px-0 md:pt-0">
-        <div className="shrink-0 space-y-4">
-        <header className="mb-5 flex items-center justify-between gap-4">
+      <div className="mx-auto flex h-[100dvh] min-h-0 w-full max-w-[430px] flex-col overflow-hidden px-[clamp(1rem,5vw,1.25rem)] pt-5 md:h-auto md:min-h-dvh md:max-w-none md:overflow-visible md:px-0 md:pt-0">
+        <div className="shrink-0 space-y-3">
+        <header className="flex items-center justify-between gap-4">
           <div className="min-w-0">
             <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[var(--bc-text-muted)]">
               Payments
@@ -639,8 +640,8 @@ export function DueDates() {
           />
         </header>
 
-        <section className="bc-card-elevated mb-4 overflow-hidden p-4">
-          <div className="flex items-start gap-3">
+        <section className="bc-card-elevated overflow-hidden p-4">
+          <div className="flex items-center gap-3">
             <div className="bc-icon-circle-amber flex h-12 w-12 shrink-0 items-center justify-center rounded-full">
               <ReceiptText className="h-5 w-5" />
             </div>
@@ -654,6 +655,12 @@ export function DueDates() {
                 stressful.
               </p>
             </div>
+
+            <BudgetCatMascot
+              className="flex h-16 w-20 shrink-0 items-center justify-center"
+              imageClassName="h-full w-full max-w-none scale-[1.65] object-contain"
+              variant="bill"
+            />
           </div>
 
           <div className="mt-4 grid grid-cols-2 gap-3">
@@ -684,56 +691,7 @@ export function DueDates() {
           </div>
         </section>
 
-        {criticalBillReminders.length > 0 && (
-          <section className="mb-4 space-y-2">
-            {criticalBillReminders.slice(0, 2).map((reminder) => {
-              const bill = dueDates.find((item) => item.id === reminder.sourceId);
-
-              if (!bill) return null;
-
-              return (
-                <article
-                  className="rounded-[22px] border border-[var(--bc-red)]/20 bg-[var(--bc-red-glow)] p-4"
-                  key={reminder.id}
-                >
-                  <div className="flex items-start gap-3">
-                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-[var(--bc-red)]/20 bg-[var(--bc-card)] text-xl">
-                      {getBillIcon(bill)}
-                    </div>
-
-                    <div className="min-w-0 flex-1">
-                      <p className="text-[11px] font-black uppercase tracking-[0.14em] text-[var(--bc-red)]">
-                        Critical reminder
-                      </p>
-                      <h2 className="mt-1 text-sm font-black text-[var(--bc-text)]">
-                        {bill.title}
-                      </h2>
-                      <p className="mt-1 text-xs font-semibold text-[var(--bc-text-muted)]">
-                        {getDueDateStatus(bill)} •{" "}
-                        {formatBillDate(bill.due_date)}
-                      </p>
-                    </div>
-
-                    <p className="shrink-0 text-right text-sm font-black text-[var(--bc-red)]">
-                      {formatCurrency(bill.amount)}
-                    </p>
-                  </div>
-
-                  <button
-                    className="bc-button bc-button-primary mt-4 w-full"
-                    onClick={() => markBillPaidWithExpense(bill)}
-                    type="button"
-                  >
-                    <CheckCircle2 className="h-4.5 w-4.5" />
-                    Mark as Paid
-                  </button>
-                </article>
-              );
-            })}
-          </section>
-        )}
-
-        <section className="bc-card mb-2 p-2">
+        <section className="bc-card p-2">
           <div className="grid grid-cols-3 gap-1">
             {(["upcoming", "paid", "overdue"] as BillTab[]).map((tab) => (
               <button
@@ -765,7 +723,55 @@ export function DueDates() {
         </section>
         </div>
 
-        <section className="scrollbar-hidden mt-4 min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain pr-1 pb-[calc(4rem+env(safe-area-inset-bottom))] md:overflow-visible md:pb-0">
+        <section className="scrollbar-hidden mt-3 min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain pr-1 pb-[calc(5rem+env(safe-area-inset-bottom))] md:overflow-visible md:pb-0">
+          {criticalBillReminders.length > 0 && (
+            <div className="space-y-2">
+              {criticalBillReminders.slice(0, 2).map((reminder) => {
+                const bill = dueDates.find((item) => item.id === reminder.sourceId);
+
+                if (!bill) return null;
+
+                return (
+                  <article
+                    className="rounded-[22px] border border-[var(--bc-red)]/20 bg-[var(--bc-red-glow)] p-3.5"
+                    key={reminder.id}
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[var(--bc-red)]/20 bg-[var(--bc-card)] text-lg">
+                        {getBillIcon(bill)}
+                      </div>
+
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[var(--bc-red)]">
+                          Critical reminder
+                        </p>
+                        <h2 className="mt-1 text-sm font-black text-[var(--bc-text)]">
+                          {bill.title}
+                        </h2>
+                        <p className="mt-1 text-xs font-semibold text-[var(--bc-text-muted)]">
+                          {getDueDateStatus(bill)} • {formatBillDate(bill.due_date)}
+                        </p>
+                      </div>
+
+                      <p className="shrink-0 text-right text-sm font-black text-[var(--bc-red)]">
+                        {formatCurrency(bill.amount)}
+                      </p>
+                    </div>
+
+                    <button
+                      className="bc-button bc-button-primary mt-3 w-full"
+                      onClick={() => markBillPaidWithExpense(bill)}
+                      type="button"
+                    >
+                      <CheckCircle2 className="h-4.5 w-4.5" />
+                      Mark as Paid
+                    </button>
+                  </article>
+                );
+              })}
+            </div>
+          )}
+
           {visibleBills.map((bill) => (
             <BillRow
               bill={bill}

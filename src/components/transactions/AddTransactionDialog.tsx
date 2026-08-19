@@ -314,7 +314,7 @@ export function AddTransactionDialog({
       {isOpen && typeof document !== "undefined"
         ? createPortal(
             <div
-              className="fixed inset-0 z-[9999] flex items-end justify-center bg-black/55 px-3 pt-6 backdrop-blur-md sm:items-center sm:p-5"
+              className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/55 px-3 pb-[calc(4.75rem+env(safe-area-inset-bottom))] pt-3 backdrop-blur-md sm:p-5"
               onMouseDown={(event) => {
                 if (event.target === event.currentTarget) {
                   setIsOpen(false);
@@ -322,7 +322,7 @@ export function AddTransactionDialog({
               }}
             >
               <section
-                className="mx-auto mb-[calc(env(safe-area-inset-bottom)+76px)] flex w-[calc(100%-1.5rem)] max-h-[78dvh] max-w-[430px] flex-col overflow-hidden rounded-[28px] border border-[var(--bc-border-strong)] bg-[var(--bc-card)] px-4 pb-4 pt-3 shadow-[0_24px_70px_rgba(0,0,0,0.38)] sm:mb-0 sm:max-h-[88vh] sm:max-w-[560px] sm:rounded-[32px] sm:p-4"
+                className="mx-auto flex w-full max-h-[76dvh] max-w-[430px] flex-col overflow-hidden rounded-[28px] border border-[var(--bc-border-strong)] bg-[var(--bc-card)] px-4 pb-4 pt-3 shadow-[0_24px_70px_rgba(0,0,0,0.38)] sm:max-h-[88vh] sm:max-w-[560px] sm:rounded-[32px] sm:p-4"
                 onMouseDown={(event) => event.stopPropagation()}
               >
                 <div className="mx-auto mb-3 h-1.5 w-12 shrink-0 rounded-full bg-[var(--bc-border-strong)] sm:hidden" />
@@ -393,14 +393,14 @@ export function AddTransactionDialog({
                       </section>
                     ) : null}
 
-                    <div className="grid grid-cols-4 gap-2">
+                    <div className="grid grid-cols-4 gap-2 max-[360px]:gap-1">
                       {mobileTransactionTypes.map((transactionType) => {
                         const isActive = normalizedType === transactionType.value;
 
                         return (
                           <button
                             className={[
-                              "min-h-10 rounded-2xl border px-2 py-2 text-[11px] font-black leading-tight transition sm:text-xs",
+                              "min-h-10 rounded-2xl border px-2 py-2 text-[11px] font-black leading-tight transition max-[360px]:px-1 max-[360px]:text-[9px] sm:text-xs",
                               getSegmentToneClasses(
                                 transactionType.tone,
                                 isActive,
@@ -446,14 +446,14 @@ export function AddTransactionDialog({
                     </section>
 
                     <div className="space-y-3">
-                      <div className="grid grid-cols-2 gap-3">
+                      <div className="grid grid-cols-2 gap-3 max-[360px]:gap-2">
                         <label className="min-w-0 space-y-1.5">
                           <span className="text-xs font-black text-[var(--bc-text)]">
                             Type
                           </span>
 
                           <select
-                            className="budget-input min-h-11 w-full min-w-0 py-2.5 text-sm"
+                            className="budget-input min-h-11 w-full min-w-0 py-2.5 text-sm max-[360px]:text-[11px]"
                             onChange={(event) =>
                               setType(event.target.value as TransactionType)
                             }
@@ -477,7 +477,7 @@ export function AddTransactionDialog({
                           </span>
 
                           <select
-                            className="budget-input min-h-11 w-full min-w-0 py-2.5 text-sm"
+                            className="budget-input min-h-11 w-full min-w-0 py-2.5 text-sm max-[360px]:text-[11px]"
                             onChange={(event) => setCategory(event.target.value)}
                             value={category}
                           >
@@ -514,14 +514,14 @@ export function AddTransactionDialog({
                         />
                       </label>
 
-                      <div className="grid grid-cols-2 gap-3">
+                      <div className="grid grid-cols-2 gap-3 max-[360px]:gap-2">
                         <label className="min-w-0 space-y-1.5">
                           <span className="text-xs font-black text-[var(--bc-text)]">
                             Date
                           </span>
 
                           <input
-                            className="budget-input min-h-11 w-full min-w-0 py-2.5 text-sm"
+                            className="budget-input min-h-11 w-full min-w-0 py-2.5 text-sm max-[360px]:text-[11px]"
                             onChange={(event) => setDate(event.target.value)}
                             type="date"
                             value={date}
@@ -534,7 +534,7 @@ export function AddTransactionDialog({
                           </span>
 
                           <select
-                            className="budget-input min-h-11 w-full min-w-0 py-2.5 text-sm"
+                            className="budget-input min-h-11 w-full min-w-0 py-2.5 text-sm max-[360px]:text-[11px]"
                             onChange={(event) => setPaymentMethod(event.target.value)}
                             value={paymentMethod}
                           >

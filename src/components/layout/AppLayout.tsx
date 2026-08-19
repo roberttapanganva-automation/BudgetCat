@@ -87,7 +87,7 @@ export function AppLayout() {
     <div className="bc-app-shell">
       <Sidebar />
 
-      <main className="min-h-screen pb-24 md:pb-0 md:pl-[var(--budget-sidebar-width)]">
+      <main className="min-h-screen md:pl-[var(--budget-sidebar-width)]">
         <div className="mx-auto min-h-screen w-full max-w-[1180px] md:px-6 md:py-6">
           <Outlet />
         </div>
