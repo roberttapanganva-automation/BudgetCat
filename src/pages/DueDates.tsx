@@ -40,7 +40,6 @@ import { requestBackgroundSync } from "../lib/requestBackgroundSync";
 import { cn, formatCurrency } from "../lib/utils";
 import type {
   BudgetCatUser,
-  DueDateStatus,
   LocalDueDate,
   RepeatType,
 } from "../types/finance";
@@ -607,6 +606,11 @@ export function DueDates() {
 
     if (!confirmed) return;
 
+    if (bill.status === "paid") {
+      const linkedTransactionId = await findLinkedBillPaymentTransactionId(bill);
+      await markLocalDueDateUnpaidWithTransaction(bill.id, linkedTransactionId);
+    }
+
     await softDeleteLocalDueDate(bill.id);
 
     if (user) {
@@ -835,7 +839,6 @@ function EditDueDateModal({
   const [dueDate, setDueDate] = useState("");
   const [repeatType, setRepeatType] = useState<RepeatType>("monthly");
   const [reminderDays, setReminderDays] = useState("3");
-  const [status, setStatus] = useState<DueDateStatus>("upcoming");
   const [note, setNote] = useState("");
   const [isSaving, setIsSaving] = useState(false);
 
@@ -847,7 +850,6 @@ function EditDueDateModal({
     setDueDate(bill.due_date);
     setRepeatType(bill.repeat_type);
     setReminderDays(String(bill.reminder_days));
-    setStatus(bill.status);
     setNote(bill.note ?? "");
   }, [bill]);
 
@@ -865,7 +867,6 @@ function EditDueDateModal({
         due_date: dueDate,
         repeat_type: repeatType,
         reminder_days: Number(reminderDays || 0),
-        status,
         note,
       });
 
@@ -1033,33 +1034,6 @@ function EditDueDateModal({
               />
             </label>
 
-            <label className="block space-y-2">
-              <span className="text-xs font-black text-[var(--bc-text-soft)]">
-                Status
-              </span>
-              <select
-                className="bc-input"
-                disabled={bill.status === "paid"}
-                onChange={(event) =>
-                  setStatus(event.target.value as DueDateStatus)
-                }
-                value={status}
-              >
-                {bill.status === "paid" ? (
-                  <option value="paid">Paid</option>
-                ) : (
-                  <>
-                    <option value="upcoming">Upcoming</option>
-                    <option value="overdue">Overdue</option>
-                  </>
-                )}
-              </select>
-              {bill.status === "paid" ? (
-                <p className="text-[11px] font-semibold text-[var(--bc-text-muted)]">
-                  Use Mark Unpaid on the bill card to reverse its ledger expense.
-                </p>
-              ) : null}
-            </label>
           </div>
 
           <label className="block space-y-2">

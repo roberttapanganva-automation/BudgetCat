@@ -659,9 +659,11 @@ function MonthFilterDropdown({
 }
 
 function TransactionRow({
+  isManaged,
   transaction,
   onEdit,
 }: {
+  isManaged: boolean;
   transaction: LocalTransaction;
   onEdit: (transaction: LocalTransaction) => void;
 }) {
@@ -670,7 +672,14 @@ function TransactionRow({
 
   return (
     <button
-className="group flex w-full items-center gap-3.5 rounded-[22px] border border-[var(--bc-border)] bg-[var(--bc-surface-soft)]/60 p-3.5 text-left transition hover:border-[var(--bc-border-strong)] hover:bg-[var(--bc-card)]"      onClick={() => onEdit(transaction)}
+      className={cn(
+        "group flex w-full items-center gap-3.5 rounded-[22px] border border-[var(--bc-border)] bg-[var(--bc-surface-soft)]/60 p-3.5 text-left transition",
+        isManaged
+          ? "cursor-default"
+          : "hover:border-[var(--bc-border-strong)] hover:bg-[var(--bc-card)]",
+      )}
+      disabled={isManaged}
+      onClick={() => onEdit(transaction)}
       type="button"
     >
       <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-[var(--bc-border)] bg-[var(--bc-card)] text-xl shadow-sm">
@@ -718,8 +727,8 @@ className="group flex w-full items-center gap-3.5 rounded-[22px] border border-[
         </p>
 
         <span className="mt-1 inline-flex items-center gap-1 text-[10px] font-bold text-[var(--bc-text-muted)] opacity-70 transition group-hover:opacity-100">
-          <Pencil className="h-3 w-3" />
-          Edit
+          {isManaged ? null : <Pencil className="h-3 w-3" />}
+          {isManaged ? "Managed" : "Edit"}
         </span>
       </div>
     </button>
@@ -773,6 +782,11 @@ export function Transactions() {
     [goalContributions, transactions],
   );
 
+  const managedTransactionIds = useMemo(
+    () => new Set(goalContributions.map((contribution) => contribution.id)),
+    [goalContributions],
+  );
+
   const filteredTransactions = useMemo(() => {
     const monthInterval = getMonthInterval(monthFilter);
     const normalizedSearch = search
@@ -781,7 +795,7 @@ export function Transactions() {
       .toLowerCase()
       .trim();
 
-    return transactions
+    return budgetTransactions
       .filter(
         (transaction) =>
           typeFilter === "all" || transaction.type === typeFilter,
@@ -807,7 +821,7 @@ export function Transactions() {
 
         return b.updated_at.localeCompare(a.updated_at);
       });
-  }, [monthFilter, search, transactions, typeFilter]);
+  }, [budgetTransactions, monthFilter, search, typeFilter]);
 
   useEffect(() => {
     if (mobileMonthFallbackApplied) return;
@@ -816,13 +830,13 @@ export function Transactions() {
     const currentMonthFilter = getMonthFilterValue();
 
     if (monthFilter !== currentMonthFilter) return;
-    if (transactions.length === 0) return;
+    if (budgetTransactions.length === 0) return;
 
     const currentMonthInterval = getMonthInterval(currentMonthFilter);
     const lastMonthFilter = getMonthFilterValue(subMonths(new Date(), 1));
     const lastMonthInterval = getMonthInterval(lastMonthFilter);
 
-    const hasCurrentMonthTransactions = transactions.some((transaction) => {
+    const hasCurrentMonthTransactions = budgetTransactions.some((transaction) => {
       const parsedDate = safeDate(transaction.date);
 
       return currentMonthInterval && parsedDate
@@ -832,7 +846,7 @@ export function Transactions() {
 
     if (hasCurrentMonthTransactions) return;
 
-    const hasLastMonthTransactions = transactions.some((transaction) => {
+    const hasLastMonthTransactions = budgetTransactions.some((transaction) => {
       const parsedDate = safeDate(transaction.date);
 
       return lastMonthInterval && parsedDate
@@ -842,7 +856,7 @@ export function Transactions() {
 
     setMonthFilter(hasLastMonthTransactions ? lastMonthFilter : "all_time");
     setMobileMonthFallbackApplied(true);
-  }, [mobileMonthFallbackApplied, monthFilter, transactions]);
+  }, [budgetTransactions, mobileMonthFallbackApplied, monthFilter]);
 
   const groupedTransactions = useMemo(
     () => getGroupedTransactions(filteredTransactions),
@@ -1053,6 +1067,10 @@ export function Transactions() {
               <div className="space-y-3">
                 {group.transactions.map((transaction) => (
                   <TransactionRow
+                    isManaged={
+                      managedTransactionIds.has(transaction.id) ||
+                      Boolean(getBillPaymentMarker(transaction.note))
+                    }
                     key={transaction.id}
                     onEdit={setEditingTransaction}
                     transaction={transaction}
@@ -1155,6 +1173,15 @@ function EditTransactionModal({
 
     if (!transaction || !user || isSaving) return;
 
+    if (getBillPaymentMarker(transaction.note)) {
+      showToast({
+        title: "Bill payment is managed in Bills.",
+        message: "Mark the bill unpaid before changing its ledger expense.",
+        tone: "warning",
+      });
+      return;
+    }
+
     setIsSaving(true);
 
     try {
@@ -1197,6 +1224,15 @@ function EditTransactionModal({
 
   async function handleDelete() {
     if (!transaction) return;
+
+    if (getBillPaymentMarker(transaction.note)) {
+      showToast({
+        title: "Bill payment is managed in Bills.",
+        message: "Mark the bill unpaid to remove its linked ledger expense.",
+        tone: "warning",
+      });
+      return;
+    }
 
     const confirmed = window.confirm("Delete this transaction from BudgetCat?");
 

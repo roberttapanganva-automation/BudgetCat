@@ -194,10 +194,6 @@ function buildSummaryForPeriod(
     isSameReportPeriod(transaction.date, year, monthIndex),
   );
 
-  const periodBills = dueDates.filter((bill) =>
-    isSameReportPeriod(bill.due_date, year, monthIndex),
-  );
-
   const income = periodTransactions
     .filter((transaction) => isIncomeType(transaction.type))
     .reduce((sum, transaction) => sum + getSafeAmount(transaction.amount), 0);
@@ -210,14 +206,17 @@ function buildSummaryForPeriod(
     )
     .reduce((sum, transaction) => sum + getSafeAmount(transaction.amount), 0);
 
+  const bills = periodTransactions
+    .filter(
+      (transaction) =>
+        isExpenseType(transaction.type) &&
+        isLinkedBillPayment(transaction, dueDates),
+    )
+    .reduce((sum, transaction) => sum + getSafeAmount(transaction.amount), 0);
+
   const savings = periodTransactions
     .filter((transaction) => isSavingsType(transaction.type))
     .reduce((sum, transaction) => sum + getSafeAmount(transaction.amount), 0);
-
-  const bills = periodBills.reduce(
-    (sum, bill) => sum + getSafeAmount(bill.amount),
-    0,
-  );
 
   const outflow = expenses + bills + savings;
   const net = income - outflow;
@@ -800,7 +799,7 @@ export function Reports() {
     summary.net >= 0
       ? {
           tone: "green" as const,
-          helper: "Income minus expenses, bills, and savings",
+          helper: "Income minus recorded expenses and savings",
         }
       : {
           tone: "red" as const,
@@ -919,7 +918,7 @@ export function Reports() {
 
         <MetricCard
           className="col-start-1 row-start-3"
-          helper="Expense transactions only"
+          helper="Non-bill expense transactions"
           icon={ReceiptText}
           label="Expenses"
           tone="red"
@@ -928,7 +927,7 @@ export function Reports() {
 
         <MetricCard
           className="col-start-2 row-start-2"
-          helper={`${bills.length} bill${bills.length === 1 ? "" : "s"} in view`}
+          helper="Paid bill expenses recorded"
           icon={CreditCard}
           label="Bills"
           tone="amber"
