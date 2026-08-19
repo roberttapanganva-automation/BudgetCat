@@ -808,7 +808,7 @@ export function Reports() {
         };
 
   return (
-    <div className="mx-auto w-full max-w-[430px] px-5 pb-20 pt-5 md:max-w-none md:px-0 md:pb-8 md:pt-0">
+    <div className="mx-auto w-full max-w-[430px] px-[clamp(1rem,5vw,1.25rem)] pb-28 pt-5 md:max-w-none md:px-0 md:pb-8 md:pt-0">
       <header className="mb-5 flex items-start justify-between gap-4">
         <div className="min-w-0">
           <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[var(--bc-text-muted)]">
@@ -897,13 +897,13 @@ export function Reports() {
       )}
 
       <section className="mb-4 grid grid-cols-2 gap-3">
-        <div className="reports-png-mascot-tile col-start-1 row-start-1 flex min-h-[170px] items-center justify-center sm:min-h-[190px]">
+        <div className="reports-png-mascot-tile col-start-1 row-start-1 flex min-h-[160px] items-center justify-center sm:min-h-[176px]">
           <div className="reports-png-mascot-glow" aria-hidden="true" />
           <img
             src="/assets/mascots/bonnie-clyde-reporting.png"
             alt=""
             aria-hidden="true"
-            className="reports-png-mascot"
+            className="reports-png-mascot scale-[1.12]"
             draggable={false}
           />
         </div>
@@ -918,7 +918,7 @@ export function Reports() {
         />
 
         <MetricCard
-          className="col-start-1 row-start-2"
+          className="col-start-1 row-start-3"
           helper="Expense transactions only"
           icon={ReceiptText}
           label="Expenses"
@@ -936,7 +936,7 @@ export function Reports() {
         />
 
         <MetricCard
-          className="col-start-2 row-start-3"
+          className="col-start-1 row-start-2"
           helper="Savings and goal contributions"
           icon={PiggyBank}
           label="Savings"
@@ -945,7 +945,7 @@ export function Reports() {
         />
 
         <MetricCard
-          className="col-start-1 row-start-3"
+          className="col-start-2 row-start-3"
           helper={netTone.helper}
           icon={Wallet}
           label="Net"

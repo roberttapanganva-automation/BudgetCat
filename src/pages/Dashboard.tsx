@@ -962,12 +962,19 @@ const billsSparklinePoints = isYearlyView
   const previewGoals = activeGoals.slice(0, 2);
   const featuredGoal = activeGoals[0];
   const upcomingBills = getDashboardUpcomingBills(dueDates, 3);
-  const reminders = getAllReminders(dueDates, goals, budgetTransactions);
+  const reminders = useMemo(
+    () => getAllReminders(dueDates, goals, budgetTransactions),
+    [budgetTransactions, dueDates, goals],
+  );
 
   useEffect(() => {
-    setReadNotificationIds((current) =>
-      current.filter((id) => reminders.some((reminder) => reminder.id === id)),
-    );
+    setReadNotificationIds((current) => {
+      const next = current.filter((id) =>
+        reminders.some((reminder) => reminder.id === id),
+      );
+
+      return next.length === current.length ? current : next;
+    });
   }, [reminders]);
 
   useEffect(() => {
@@ -1051,13 +1058,13 @@ const billsSparklinePoints = isYearlyView
   }
 
   return (
-    <div className="mx-auto w-full max-w-[430px] px-5 pb-[30px] pt-5 md:max-w-none md:px-0 md:pb-4 md:pt-0">
+    <div className="mx-auto w-full max-w-[430px] px-[clamp(1rem,5vw,1.25rem)] pb-28 pt-5 md:max-w-none md:px-0 md:pb-4 md:pt-0">
       <header className="mb-5 flex items-center justify-between gap-4">
         <div className="min-w-0">
           <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[var(--bc-text-muted)]">
             {monthLabel}
           </p>
-          <h1 className="mt-1 truncate text-lg font-black tracking-[-0.04em] text-[var(--bc-text)] sm:text-[1.7rem] md:text-3xl">
+          <h1 className="mt-1 text-[clamp(1rem,4.7vw,1.35rem)] font-black leading-tight tracking-[-0.04em] text-[var(--bc-text)] sm:text-[1.7rem] md:text-3xl">
             {greeting}, {nickname}!{" "}
             <span aria-hidden="true" className="bc-wave-emoji">
               {"\u{1F44B}"}
@@ -1266,15 +1273,15 @@ const billsSparklinePoints = isYearlyView
       <section className="grid gap-4 xl:grid-cols-[1.05fr_0.95fr]">
         <div className="space-y-4">
           <article className="relative z-30 min-h-[176px] overflow-visible px-3 py-2">
-            <div className="pointer-events-none absolute inset-y-0 right-0 z-0 w-[52%] overflow-hidden">
+            <div className="pointer-events-none absolute inset-y-0 right-0 z-0 w-[52%] overflow-hidden max-[360px]:w-[48%]">
               <BudgetCatMascot
                 className="absolute inset-0 flex h-full w-full items-center justify-center"
-                imageClassName="h-full w-full scale-[3.75] object-contain object-center"
+                imageClassName="h-full w-full scale-[3.75] object-contain object-center max-[360px]:scale-[3.1]"
                 variant="both"
               />
             </div>
 
-            <div className="relative z-10 flex min-h-[150px] max-w-[55%] flex-col justify-between">
+            <div className="relative z-10 flex min-h-[150px] max-w-[55%] flex-col justify-between max-[360px]:max-w-[52%]">
               <div>
                 <div className="inline-flex items-center gap-2 rounded-full border border-[var(--bc-border)] bg-[var(--bc-card)]/80 px-3 py-1 text-[11px] font-black text-[var(--bc-green)]">
                   <ShieldCheck className="h-3.5 w-3.5" />
@@ -1283,10 +1290,10 @@ const billsSparklinePoints = isYearlyView
                     : "All synced"}
                 </div>
 
-                <h2 className="mt-5 text-3xl font-black tracking-[-0.06em] text-[var(--bc-text)]">
+                <h2 className="mt-5 text-3xl font-black tracking-[-0.06em] text-[var(--bc-text)] max-[360px]:text-[1.55rem]">
                   BudgetCat
                 </h2>
-                <p className="mt-1 text-xs font-semibold text-[var(--bc-text-muted)] sm:text-sm">
+                <p className="mt-1 text-xs font-semibold text-[var(--bc-text-muted)] max-[360px]:text-[10px] sm:text-sm">
                   Smart•Friendly•Focused.
                 </p>
               </div>

@@ -913,7 +913,7 @@ export function Transactions() {
 
   return (
     <>
-      <section className="mx-auto flex h-[100dvh] min-h-0 w-full max-w-[430px] flex-col overflow-hidden px-5 pt-5 md:h-auto md:min-h-dvh md:max-w-none md:overflow-visible md:px-0 md:pt-0">
+      <section className="mx-auto flex h-[100dvh] min-h-0 w-full max-w-[430px] flex-col overflow-hidden px-[clamp(1rem,5vw,1.25rem)] pt-5 md:h-auto md:min-h-dvh md:max-w-none md:overflow-visible md:px-0 md:pt-0">
         <div className="shrink-0 space-y-4">
           <header className="flex items-start justify-between gap-4 pt-1">
             <div className="min-w-0">
@@ -956,10 +956,11 @@ export function Transactions() {
           </div>
 
           <div className="mt-5 grid grid-cols-3 gap-3">
-              <div className="rounded-2xl border border-[var(--bc-green)]/20 bg-[var(--bc-green-glow)] p-4">
-                <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[var(--bc-text-muted)]">
-                  Income
-                </p>
+              <div className="rounded-2xl border border-[var(--bc-green)]/20 bg-[var(--bc-green-glow)] p-3 sm:p-4">
+                <div className="flex items-center gap-1.5 text-[var(--bc-green)]">
+                  <ArrowUpCircle className="h-4 w-4 shrink-0" />
+                  <p className="text-[10px] font-black uppercase tracking-[0.12em] text-[var(--bc-text-muted)]">Income</p>
+                </div>
 
                 <p className="mt-1 truncate text-sm font-black text-[var(--bc-green)]">
                   <span className="sm:hidden">
@@ -971,10 +972,11 @@ export function Transactions() {
                 </p>
               </div>
 
-              <div className="rounded-2xl border border-[var(--bc-red)]/20 bg-[var(--bc-red-glow)] p-4">
-                <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[var(--bc-text-muted)]">
-                  Expenses
-                </p>
+              <div className="rounded-2xl border border-[var(--bc-red)]/20 bg-[var(--bc-red-glow)] p-3 sm:p-4">
+                <div className="flex items-center gap-1.5 text-[var(--bc-red)]">
+                  <TrendingDown className="h-4 w-4 shrink-0" />
+                  <p className="text-[10px] font-black uppercase tracking-[0.12em] text-[var(--bc-text-muted)]">Expenses</p>
+                </div>
 
                 <p className="mt-1 truncate text-sm font-black text-[var(--bc-red)]">
                   <span className="sm:hidden">
@@ -986,10 +988,11 @@ export function Transactions() {
                 </p>
               </div>
 
-              <div className="rounded-2xl border border-[var(--bc-blue)]/20 bg-[var(--bc-blue)]/10 p-4">
-                <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[var(--bc-text-muted)]">
-                  Savings
-                </p>
+              <div className="rounded-2xl border border-[var(--bc-blue)]/20 bg-[var(--bc-blue)]/10 p-3 sm:p-4">
+                <div className="flex items-center gap-1.5 text-[var(--bc-blue)]">
+                  <PiggyBank className="h-4 w-4 shrink-0" />
+                  <p className="text-[10px] font-black uppercase tracking-[0.12em] text-[var(--bc-text-muted)]">Savings</p>
+                </div>
 
                 <p className="mt-1 truncate text-sm font-black text-[var(--bc-blue)]">
                   <span className="sm:hidden">
@@ -1031,7 +1034,7 @@ export function Transactions() {
 
         <section
           className={cn(
-            "scrollbar-hidden mt-4 min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain pr-1 pb-[calc(3.25rem+env(safe-area-inset-bottom))] md:overflow-visible md:pb-0",
+            "scrollbar-hidden mt-4 min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain pr-1 pb-[calc(5rem+env(safe-area-inset-bottom))] md:overflow-visible md:pb-0",
             filteredTransactions.length === 0 && "flex flex-col",
           )}
         >
