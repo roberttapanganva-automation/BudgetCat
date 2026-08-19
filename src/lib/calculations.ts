@@ -4,23 +4,55 @@ import {
   endOfMonth,
   isAfter,
   isBefore,
+  isValid,
   isSameDay,
   parseISO,
   startOfMonth,
 } from "date-fns";
-import type { LocalDueDate, LocalGoal, LocalTransaction } from "../types/finance";
+import type {
+  LocalDueDate,
+  LocalGoal,
+  LocalGoalContribution,
+  LocalTransaction,
+} from "../types/finance";
+
+function getSafeAmount(value: number) {
+  return Number.isFinite(value) && value >= 0 ? value : 0;
+}
+
+export function mergeGoalContributionsForCalculations(
+  transactions: LocalTransaction[],
+  goalContributions: LocalGoalContribution[],
+) {
+  const contributionTransactions = goalContributions
+    .filter(
+      (contribution) =>
+        !contribution.deleted_at &&
+        Number.isFinite(contribution.amount) &&
+        contribution.amount > 0,
+    )
+    .map<LocalTransaction>((contribution) => ({
+      ...contribution,
+      type: "goal_contribution",
+      category: "Goal Contribution",
+      payment_method: "Goal",
+    }));
+
+  return [...transactions, ...contributionTransactions];
+}
 
 export function getTransactionAmountForBudget(transaction: LocalTransaction) {
   if (transaction.deleted_at) return 0;
+  const amount = getSafeAmount(transaction.amount);
   if (transaction.type === "income" || transaction.type === "salary") {
-    return transaction.amount;
+    return amount;
   }
   if (
     transaction.type === "expense" ||
     transaction.type === "savings" ||
     transaction.type === "goal_contribution"
   ) {
-    return -transaction.amount;
+    return -amount;
   }
   return 0;
 }
@@ -34,23 +66,24 @@ export function calculateMonthlySummary(
   const currentMonthTransactions = transactions.filter((transaction) => {
     if (transaction.deleted_at) return false;
     const date = parseISO(transaction.date);
+    if (!isValid(date)) return false;
     return !isBefore(date, start) && !isAfter(date, end);
   });
 
   const income = currentMonthTransactions
     .filter((transaction) => transaction.type === "income" || transaction.type === "salary")
-    .reduce((sum, transaction) => sum + transaction.amount, 0);
+    .reduce((sum, transaction) => sum + getSafeAmount(transaction.amount), 0);
 
   const expenses = currentMonthTransactions
     .filter((transaction) => transaction.type === "expense")
-    .reduce((sum, transaction) => sum + transaction.amount, 0);
+    .reduce((sum, transaction) => sum + getSafeAmount(transaction.amount), 0);
 
   const savings = currentMonthTransactions
     .filter(
       (transaction) =>
         transaction.type === "savings" || transaction.type === "goal_contribution",
     )
-    .reduce((sum, transaction) => sum + transaction.amount, 0);
+    .reduce((sum, transaction) => sum + getSafeAmount(transaction.amount), 0);
 
   return {
     income,
@@ -61,17 +94,26 @@ export function calculateMonthlySummary(
 }
 
 export function getGoalProgress(goal: LocalGoal) {
-  if (goal.target_amount <= 0) return 0;
-  return Math.min(100, Math.round((goal.current_amount / goal.target_amount) * 100));
+  const targetAmount = getSafeAmount(goal.target_amount);
+  const currentAmount = getSafeAmount(goal.current_amount);
+
+  if (targetAmount <= 0) return 0;
+  return Math.min(100, Math.round((currentAmount / targetAmount) * 100));
 }
 
 export function getGoalRemaining(goal: LocalGoal) {
-  return Math.max(0, goal.target_amount - goal.current_amount);
+  return Math.max(
+    0,
+    getSafeAmount(goal.target_amount) - getSafeAmount(goal.current_amount),
+  );
 }
 
 export function getGoalMonthsLeft(goal: LocalGoal, referenceDate = new Date()) {
   if (!goal.target_date) return 0;
-  return Math.max(0, differenceInCalendarMonths(parseISO(goal.target_date), referenceDate));
+  const targetDate = parseISO(goal.target_date);
+  if (!isValid(targetDate)) return 0;
+
+  return Math.max(0, differenceInCalendarMonths(targetDate, referenceDate));
 }
 
 export function getSuggestedMonthlySaving(goal: LocalGoal, referenceDate = new Date()) {
@@ -85,6 +127,7 @@ export function getDueDateStatus(dueDate: LocalDueDate, referenceDate = new Date
   if (dueDate.status === "paid") return "Paid";
 
   const date = parseISO(dueDate.due_date);
+  if (!isValid(date)) return "No due date";
   const dayDiff = differenceInCalendarDays(date, referenceDate);
 
   if (isSameDay(date, referenceDate)) return "Due today";
@@ -97,7 +140,8 @@ export function getDueDateStatus(dueDate: LocalDueDate, referenceDate = new Date
 export function getTopSpendingCategory(transactions: LocalTransaction[]) {
   const totals = transactions.reduce<Record<string, number>>((acc, transaction) => {
     if (transaction.deleted_at || transaction.type !== "expense") return acc;
-    acc[transaction.category] = (acc[transaction.category] ?? 0) + transaction.amount;
+    acc[transaction.category] =
+      (acc[transaction.category] ?? 0) + getSafeAmount(transaction.amount);
     return acc;
   }, {});
 

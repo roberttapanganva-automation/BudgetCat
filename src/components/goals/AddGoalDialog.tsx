@@ -257,9 +257,11 @@ export function AddGoalDialog({
                   <input
                     className="min-w-0 w-full flex-1 border-0 bg-transparent text-[1.65rem] font-black tracking-[-0.05em] text-[var(--bc-text)] outline-none placeholder:text-[var(--bc-text-muted)] sm:text-3xl sm:tracking-[-0.07em]"
                     inputMode="decimal"
+                    min="0.01"
                     onChange={(event) => setTargetAmount(event.target.value)}
                     placeholder="0"
                     required
+                    step="0.01"
                     type="number"
                     value={targetAmount}
                   />
@@ -277,8 +279,10 @@ export function AddGoalDialog({
                   <input
                     className="min-w-0 w-full flex-1 border-0 bg-transparent text-[1.65rem] font-black tracking-[-0.05em] text-[var(--bc-text)] outline-none placeholder:text-[var(--bc-text-muted)] sm:text-3xl sm:tracking-[-0.07em]"
                     inputMode="decimal"
+                    min="0"
                     onChange={(event) => setCurrentAmount(event.target.value)}
                     placeholder="0"
+                    step="0.01"
                     type="number"
                     value={currentAmount}
                   />

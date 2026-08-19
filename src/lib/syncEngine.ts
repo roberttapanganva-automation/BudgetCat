@@ -4,6 +4,7 @@ import { db, markRecordSyncStatus, nowIso } from "./localDb";
 import { getSupabaseSessionOnce, hasSupabaseConfig, supabase } from "./supabase";
 import { setLatestSyncError } from "./syncErrorStore";
 import { setSyncStatus } from "./syncStatusStore";
+import { toLocalDateString } from "./utils";
 import type {
   BudgetCatSyncError,
   BudgetCatUser,
@@ -111,7 +112,7 @@ function canApplyRemote(local: LocalTransaction | LocalDueDate | LocalGoal | Loc
 
 function mapRemoteTransaction(record: RemoteRecord, userId: string, householdId: string): LocalTransaction {
   const type = toStringValue(record.type, "expense") as LocalTransaction["type"];
-  const date = toStringValue(record.date, toStringValue(record.transaction_date, new Date().toISOString().slice(0, 10)));
+  const date = toStringValue(record.date, toStringValue(record.transaction_date, toLocalDateString()));
 
   return {
     id: toStringValue(record.id),
@@ -137,7 +138,7 @@ function mapRemoteDueDate(record: RemoteRecord, userId: string, householdId: str
     user_id: toStringValue(record.user_id, userId),
     title: toStringValue(record.title, "Untitled bill"),
     amount: toNumberValue(record.amount),
-    due_date: toStringValue(record.due_date, new Date().toISOString().slice(0, 10)),
+    due_date: toStringValue(record.due_date, toLocalDateString()),
     repeat_type: toStringValue(record.repeat_type, "none") as LocalDueDate["repeat_type"],
     reminder_days: toReminderDays(record.reminder_days),
     status: toStringValue(record.status, "upcoming") as LocalDueDate["status"],
@@ -158,7 +159,7 @@ function mapRemoteGoal(record: RemoteRecord, userId: string, householdId: string
     title: toStringValue(record.title, "Untitled goal"),
     target_amount: toNumberValue(record.target_amount),
     current_amount: toNumberValue(record.current_amount),
-    target_date: toStringValue(record.target_date, new Date().toISOString().slice(0, 10)),
+    target_date: toStringValue(record.target_date, toLocalDateString()),
     priority: toStringValue(record.priority, "medium") as LocalGoal["priority"],
     status: toStringValue(record.status, "active") as LocalGoal["status"],
     note: toStringValue(record.note, toStringValue(record.notes, "")),
@@ -176,7 +177,7 @@ function mapRemoteGoalContribution(record: RemoteRecord, userId: string, househo
     user_id: toStringValue(record.user_id, userId),
     goal_id: toStringValue(record.goal_id),
     amount: toNumberValue(record.amount),
-    date: toStringValue(record.date, toStringValue(record.contribution_date, new Date().toISOString().slice(0, 10))),
+    date: toStringValue(record.date, toStringValue(record.contribution_date, toLocalDateString())),
     note: toStringValue(record.note, toStringValue(record.notes, "")),
     sync_status: "synced",
     created_at: toIso(record.created_at),

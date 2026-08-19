@@ -30,6 +30,7 @@ import {
 } from "recharts";
 
 import { useAuth } from "../contexts/AuthContext";
+import { mergeGoalContributionsForCalculations } from "../lib/calculations";
 import { getCategoryLabel } from "../lib/categoryConfig";
 import { getDueDateIcon } from "../lib/iconMap";
 import { db } from "../lib/localDb";
@@ -118,7 +119,8 @@ function formatReportDate(value?: string | null) {
 }
 
 function getSafeAmount(value: number | string | null | undefined) {
-  return Number(value || 0);
+  const amount = Number(value || 0);
+  return Number.isFinite(amount) && amount >= 0 ? amount : 0;
 }
 
 function isIncomeType(type: string) {
@@ -131,6 +133,24 @@ function isExpenseType(type: string) {
 
 function isSavingsType(type: string) {
   return type === "savings" || type === "goal_contribution";
+}
+
+function isLinkedBillPayment(
+  transaction: LocalTransaction,
+  dueDates: LocalDueDate[],
+) {
+  if (
+    dueDates.some(
+      (bill) => bill.paid_transaction_id === transaction.id,
+    )
+  ) {
+    return true;
+  }
+
+  const markerMatch = (transaction.note ?? "").match(/\[bill:([^\]]+)\]/i);
+  const billId = markerMatch?.[1];
+
+  return Boolean(billId && dueDates.some((bill) => bill.id === billId));
 }
 
 function isSameReportPeriod(
@@ -183,7 +203,11 @@ function buildSummaryForPeriod(
     .reduce((sum, transaction) => sum + getSafeAmount(transaction.amount), 0);
 
   const expenses = periodTransactions
-    .filter((transaction) => isExpenseType(transaction.type))
+    .filter(
+      (transaction) =>
+        isExpenseType(transaction.type) &&
+        !isLinkedBillPayment(transaction, dueDates),
+    )
     .reduce((sum, transaction) => sum + getSafeAmount(transaction.amount), 0);
 
   const savings = periodTransactions
@@ -219,13 +243,18 @@ function hasSummaryData(summary: ReportSummary) {
 
 function buildCategoriesForPeriod(
   transactions: LocalTransaction[],
+  dueDates: LocalDueDate[],
   year: number,
   monthIndex?: number,
 ): ReportCategory[] {
   const categoryMap = new Map<string, number>();
 
   transactions
-    .filter((transaction) => isExpenseType(transaction.type))
+    .filter(
+      (transaction) =>
+        isExpenseType(transaction.type) &&
+        !isLinkedBillPayment(transaction, dueDates),
+    )
     .filter((transaction) =>
       isSameReportPeriod(transaction.date, year, monthIndex),
     )
@@ -687,9 +716,30 @@ export function Reports() {
       [],
     ) ?? [];
 
+  const goalContributions =
+    useLiveQuery(
+      () =>
+        db.goal_contributions
+          .where("household_id")
+          .equals(householdId)
+          .filter((contribution) => !contribution.deleted_at)
+          .toArray(),
+      [householdId],
+      [],
+    ) ?? [];
+
+  const budgetTransactions = useMemo(
+    () =>
+      mergeGoalContributionsForCalculations(
+        transactions,
+        goalContributions,
+      ),
+    [goalContributions, transactions],
+  );
+
   const reportYearOptions = useMemo(
-    () => buildYearOptions(transactions, dueDates, selectedYear),
-    [dueDates, selectedYear, transactions],
+    () => buildYearOptions(budgetTransactions, dueDates, selectedYear),
+    [budgetTransactions, dueDates, selectedYear],
   );
 
   const isYearlyView = selectedReportView === "yearly";
@@ -701,22 +751,23 @@ export function Reports() {
   const summary = useMemo(
     () =>
       buildSummaryForPeriod(
-        transactions,
+        budgetTransactions,
         dueDates,
         selectedYear,
         isYearlyView ? undefined : selectedMonth,
       ),
-    [dueDates, isYearlyView, selectedMonth, selectedYear, transactions],
+    [budgetTransactions, dueDates, isYearlyView, selectedMonth, selectedYear],
   );
 
   const categories = useMemo(
     () =>
       buildCategoriesForPeriod(
-        transactions,
+        budgetTransactions,
+        dueDates,
         selectedYear,
         isYearlyView ? undefined : selectedMonth,
       ),
-    [isYearlyView, selectedMonth, selectedYear, transactions],
+    [budgetTransactions, dueDates, isYearlyView, selectedMonth, selectedYear],
   );
 
   const bills = useMemo(
@@ -730,8 +781,8 @@ export function Reports() {
   );
 
   const trendData = useMemo(
-    () => buildTrendData(transactions, dueDates, selectedYear),
-    [dueDates, selectedYear, transactions],
+    () => buildTrendData(budgetTransactions, dueDates, selectedYear),
+    [budgetTransactions, dueDates, selectedYear],
   );
 
   const focusedTrendData = isYearlyView

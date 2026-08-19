@@ -6,7 +6,7 @@ import { useToast } from "../../hooks/useToast";
 import { addLocalDueDate } from "../../lib/localDb";
 import { requestBackgroundSync } from "../../lib/requestBackgroundSync";
 import { playCreateSuccessFeedback } from "../../lib/soundFeedback";
-import type { DueDateStatus, RepeatType } from "../../types/finance";
+import type { RepeatType } from "../../types/finance";
 import { Button } from "../ui/Button";
 import { Modal } from "../ui/Modal";
 
@@ -25,12 +25,10 @@ export function AddDueDateDialog({
   const showToast = useToast();
   const [isOpen, setIsOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [status, setStatus] = useState<DueDateStatus>("upcoming");
   const [repeatType, setRepeatType] = useState<RepeatType>("monthly");
 
   function resetForm(form: HTMLFormElement) {
     form.reset();
-    setStatus("upcoming");
     setRepeatType("monthly");
   }
 
@@ -53,7 +51,7 @@ export function AddDueDateDialog({
           ),
           repeat_type: repeatType,
           reminder_days: Number(formData.get("reminder_days") || 3),
-          status,
+          status: "upcoming",
           note: String(formData.get("note") || ""),
         },
         user.id,
@@ -94,7 +92,15 @@ export function AddDueDateDialog({
           </label>
           <label className="grid gap-2 text-sm font-bold">
             Amount
-            <input className="bc-input" min="0" name="amount" placeholder="0" required type="number" />
+            <input
+              className="bc-input"
+              min="0.01"
+              name="amount"
+              placeholder="0"
+              required
+              step="0.01"
+              type="number"
+            />
           </label>
           <label className="grid gap-2 text-sm font-bold">
             Due Date
@@ -115,19 +121,7 @@ export function AddDueDateDialog({
           </label>
           <label className="grid gap-2 text-sm font-bold">
             Reminder Days
-            <input className="bc-input" defaultValue="3" min="0" name="reminder_days" type="number" />
-          </label>
-          <label className="grid gap-2 text-sm font-bold">
-            Status
-            <select
-              className="bc-input"
-              onChange={(event) => setStatus(event.target.value as DueDateStatus)}
-              value={status}
-            >
-              <option value="upcoming">Upcoming</option>
-              <option value="paid">Paid</option>
-              <option value="overdue">Overdue</option>
-            </select>
+            <input className="bc-input" defaultValue="3" min="0" name="reminder_days" step="1" type="number" />
           </label>
           <label className="grid gap-2 text-sm font-bold sm:col-span-2">
             Note

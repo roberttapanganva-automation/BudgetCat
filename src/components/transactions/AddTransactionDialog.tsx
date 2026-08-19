@@ -88,7 +88,7 @@ const mobileTransactionTypes: Array<{
   tone: "expense" | "income" | "savings";
 }> = [
   { label: "Expense", value: "expense", tone: "expense" },
-  { label: "Income", value: "income", tone: "income" },
+  { label: "Income/Salary", value: "income", tone: "income" },
   { label: "Savings", value: "savings", tone: "savings" },
   { label: "Goals", value: "goal_contribution", tone: "savings" },
 ];
@@ -488,7 +488,7 @@ export function AddTransactionDialog({
                                 key={categoryOption.id}
                                 value={categoryOption.id}
                               >
-                                {categoryEmojis[categoryOption.id] ?? "�"}{" "}
+                                {categoryEmojis[categoryOption.id] ?? "🏷️"}{" "}
                                 {categoryOption.label}
                               </option>
                             ))}
@@ -504,9 +504,11 @@ export function AddTransactionDialog({
                         <input
                           className="budget-input min-h-11 w-full py-2.5"
                           inputMode="decimal"
+                          min="0.01"
                           onChange={(event) => setAmount(event.target.value)}
                           placeholder="PHP 0"
                           required
+                          step="0.01"
                           type="number"
                           value={amount}
                         />

@@ -37,6 +37,7 @@ import { Button } from "../components/ui/Button";
 import { Modal } from "../components/ui/Modal";
 import { useAuth } from "../contexts/AuthContext";
 import { useToast } from "../hooks/useToast";
+import { mergeGoalContributionsForCalculations } from "../lib/calculations";
 import {
   getCategoriesByType,
   getCategoryLabel,
@@ -139,6 +140,11 @@ const filterTypeLabels: Record<TransactionFilter, string> =
 
 const MONTH_INDEXES = Array.from({ length: 12 }, (_, index) => index);
 
+function getSafeAmount(value: unknown) {
+  const amount = Number(value || 0);
+  return Number.isFinite(amount) && amount >= 0 ? amount : 0;
+}
+
 function formatMobileSummaryCurrency(amount: number) {
   const absoluteAmount = Math.abs(amount);
 
@@ -191,7 +197,17 @@ function getTransactionDisplayNote(transaction: LocalTransaction) {
     return autoBillMatch[1].trim();
   }
 
+  const linkedBillMatch = /^(.+?)\s*\[bill:[^\]]+\]\s*$/i.exec(note);
+
+  if (linkedBillMatch?.[1]) {
+    return linkedBillMatch[1].trim();
+  }
+
   return note;
+}
+
+function getBillPaymentMarker(note?: string | null) {
+  return safeText(note).match(/\[bill:[^\]]+\]/i)?.[0] ?? "";
 }
 
 function getCategoryTypeForTransaction(type: TransactionType) {
@@ -736,6 +752,27 @@ export function Transactions() {
       [],
     ) ?? [];
 
+  const goalContributions =
+    useLiveQuery(
+      () =>
+        db.goal_contributions
+          .where("household_id")
+          .equals(householdId)
+          .filter((contribution) => !contribution.deleted_at)
+          .toArray(),
+      [householdId],
+      [],
+    ) ?? [];
+
+  const budgetTransactions = useMemo(
+    () =>
+      mergeGoalContributionsForCalculations(
+        transactions,
+        goalContributions,
+      ),
+    [goalContributions, transactions],
+  );
+
   const filteredTransactions = useMemo(() => {
     const monthInterval = getMonthInterval(monthFilter);
     const normalizedSearch = search
@@ -816,16 +853,16 @@ export function Transactions() {
     return filteredTransactions.reduce(
       (summary, transaction) => {
         if (isIncomeTransaction(transaction)) {
-          summary.income += Number(transaction.amount || 0);
+          summary.income += getSafeAmount(transaction.amount);
           return summary;
         }
 
         if (isSavingsTransaction(transaction)) {
-          summary.savings += Number(transaction.amount || 0);
+          summary.savings += getSafeAmount(transaction.amount);
           return summary;
         }
 
-        summary.expenses += Number(transaction.amount || 0);
+        summary.expenses += getSafeAmount(transaction.amount);
         return summary;
       },
       { income: 0, expenses: 0, savings: 0 },
@@ -835,7 +872,7 @@ export function Transactions() {
   const budgetHealthPercent = useMemo(() => {
     const monthInterval = getMonthInterval(monthFilter);
 
-    const scopedTransactions = transactions.filter((transaction) => {
+    const scopedTransactions = budgetTransactions.filter((transaction) => {
       if (!monthInterval) return true;
       const parsedDate = safeDate(transaction.date);
       return parsedDate ? isWithinInterval(parsedDate, monthInterval) : false;
@@ -843,7 +880,7 @@ export function Transactions() {
 
     const scoped = scopedTransactions.reduce(
       (summary, transaction) => {
-        const amount = Number(transaction.amount || 0);
+        const amount = getSafeAmount(transaction.amount);
 
         if (transaction.type === "income" || transaction.type === "salary") {
           summary.income += amount;
@@ -872,7 +909,7 @@ export function Transactions() {
     return scoped.income > 0
       ? Math.max(0, Math.min(100, Math.round((remaining / scoped.income) * 100)))
       : 0;
-  }, [monthFilter, transactions]);
+  }, [budgetTransactions, monthFilter]);
 
   return (
     <>
@@ -1085,7 +1122,7 @@ function EditTransactionModal({
     setCategory(normalizedCategory?.id || transaction.category || "");
     setDate(transaction.date);
     setPaymentMethod(normalizePaymentMethod(transaction.payment_method));
-    setNote(safeText(transaction.note));
+    setNote(getTransactionDisplayNote(transaction));
   }, [transaction]);
 
   useEffect(() => {
@@ -1121,6 +1158,10 @@ function EditTransactionModal({
       const normalizedCategory = normalizeCategory(category);
       const savedCategory =
         normalizedCategory?.id || category || "Uncategorized";
+      const billPaymentMarker = getBillPaymentMarker(transaction.note);
+      const savedNote = billPaymentMarker
+        ? `${note.trim()} ${billPaymentMarker}`.trim()
+        : note;
 
       const updatedTransaction: LocalTransaction = {
         ...transaction,
@@ -1129,7 +1170,7 @@ function EditTransactionModal({
         category: savedCategory,
         date,
         payment_method: normalizePaymentMethod(paymentMethod),
-        note,
+        note: savedNote,
       };
 
       await updateLocalTransaction(transaction.id, {
@@ -1138,7 +1179,7 @@ function EditTransactionModal({
         category: updatedTransaction.category,
         date,
         payment_method: updatedTransaction.payment_method,
-        note,
+        note: savedNote,
       });
 
       onClose();
@@ -1263,8 +1304,10 @@ function EditTransactionModal({
             Amount
             <input
               className={fieldClass}
+              min="0.01"
               onChange={(event) => setAmount(event.target.value)}
               required
+              step="0.01"
               type="number"
               value={amount}
             />
