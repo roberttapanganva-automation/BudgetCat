@@ -34,6 +34,7 @@ type AuthBootState =
 type AuthContextValue = {
   user: BudgetCatUser | null;
   isLoading: boolean;
+  isPasswordRecovery: boolean;
   authBootState: AuthBootState;
   authError: string | null;
   authMessage: string | null;
@@ -260,6 +261,7 @@ function getFriendlyAuthError(error: AuthError | Error) {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<BudgetCatUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isPasswordRecovery, setIsPasswordRecovery] = useState(false);
   const [authBootState, setAuthBootState] = useState<AuthBootState>("initializing");
   const [authError, setAuthError] = useState<string | null>(null);
   const [authMessage, setAuthMessage] = useState<string | null>(null);
@@ -475,7 +477,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === "PASSWORD_RECOVERY") setIsPasswordRecovery(true);
+      if (event === "SIGNED_OUT") setIsPasswordRecovery(false);
       window.setTimeout(() => {
         if (!isMounted) return;
 
@@ -669,10 +673,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setAuthMessage(null);
 
     if (hasSupabaseConfig && supabase) {
-      await supabase.auth.signOut();
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
     }
 
     localStorage.removeItem(localSessionKey);
+    setIsPasswordRecovery(false);
     setUser(null);
     setAuthBootState("unauthenticated");
   }, []);
@@ -685,6 +691,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     () => ({
       user,
       isLoading,
+      isPasswordRecovery,
       authBootState,
       authError,
       authMessage,
@@ -700,6 +707,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       authBootState,
       authMessage,
       isLoading,
+      isPasswordRecovery,
       retryStartup,
       signIn,
       signOut,

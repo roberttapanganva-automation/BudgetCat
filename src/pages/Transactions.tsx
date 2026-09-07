@@ -5,7 +5,6 @@ import {
   isWithinInterval,
   parseISO,
   startOfMonth,
-  subMonths,
 } from "date-fns";
 import { useLiveQuery } from "dexie-react-hooks";
 import {
@@ -744,8 +743,6 @@ export function Transactions() {
   const [monthFilter, setMonthFilter] = useState<MonthFilter>(() =>
     getMonthFilterValue(),
   );
-  const [mobileMonthFallbackApplied, setMobileMonthFallbackApplied] =
-    useState(false);
   const [editingTransaction, setEditingTransaction] =
     useState<LocalTransaction | null>(null);
 
@@ -822,41 +819,6 @@ export function Transactions() {
         return b.updated_at.localeCompare(a.updated_at);
       });
   }, [budgetTransactions, monthFilter, search, typeFilter]);
-
-  useEffect(() => {
-    if (mobileMonthFallbackApplied) return;
-    if (window.innerWidth >= 768) return;
-
-    const currentMonthFilter = getMonthFilterValue();
-
-    if (monthFilter !== currentMonthFilter) return;
-    if (budgetTransactions.length === 0) return;
-
-    const currentMonthInterval = getMonthInterval(currentMonthFilter);
-    const lastMonthFilter = getMonthFilterValue(subMonths(new Date(), 1));
-    const lastMonthInterval = getMonthInterval(lastMonthFilter);
-
-    const hasCurrentMonthTransactions = budgetTransactions.some((transaction) => {
-      const parsedDate = safeDate(transaction.date);
-
-      return currentMonthInterval && parsedDate
-        ? isWithinInterval(parsedDate, currentMonthInterval)
-        : false;
-    });
-
-    if (hasCurrentMonthTransactions) return;
-
-    const hasLastMonthTransactions = budgetTransactions.some((transaction) => {
-      const parsedDate = safeDate(transaction.date);
-
-      return lastMonthInterval && parsedDate
-        ? isWithinInterval(parsedDate, lastMonthInterval)
-        : false;
-    });
-
-    setMonthFilter(hasLastMonthTransactions ? lastMonthFilter : "all_time");
-    setMobileMonthFallbackApplied(true);
-  }, [budgetTransactions, mobileMonthFallbackApplied, monthFilter]);
 
   const groupedTransactions = useMemo(
     () => getGroupedTransactions(filteredTransactions),

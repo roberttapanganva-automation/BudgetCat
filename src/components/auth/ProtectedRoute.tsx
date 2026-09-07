@@ -3,8 +3,10 @@ import { useAuth } from "../../contexts/AuthContext";
 import { StartupRecoveryScreen } from "./StartupRecoveryScreen";
 
 export function ProtectedRoute() {
-  const { isLoading, retryStartup, startupError, user } = useAuth();
+  const { isLoading, isPasswordRecovery, retryStartup, startupError, user } = useAuth();
   const location = useLocation();
+
+  if (isPasswordRecovery) return <Navigate replace to="/reset-password" />;
 
   if (startupError) {
     return <StartupRecoveryScreen error={startupError} onTryAgain={retryStartup} />;

@@ -11,6 +11,7 @@ import { Dashboard } from "./pages/Dashboard";
 import { DueDates } from "./pages/DueDates";
 import { Goals } from "./pages/Goals";
 import { Login } from "./pages/Login";
+import { PasswordRecovery } from "./pages/PasswordRecovery";
 import { Reports } from "./pages/Reports";
 import { Settings } from "./pages/Settings";
 import { Transactions } from "./pages/Transactions";
@@ -34,6 +35,8 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
       <ToastProvider>
         <Router>
           <Routes>
+            <Route path="/forgot-password" element={<PasswordRecovery mode="request" />} />
+            <Route path="/reset-password" element={<PasswordRecovery mode="reset" />} />
             <Route element={<PublicOnlyRoute />}>
               <Route path="/login" element={<Login />} />
             </Route>

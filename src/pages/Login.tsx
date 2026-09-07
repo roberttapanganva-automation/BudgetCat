@@ -10,6 +10,7 @@ import {
   WifiOff,
 } from "../lib/icons";
 import { type FormEvent, useState } from "react";
+import { Link, useLocation } from "react-router-dom";
 
 import { ThemeToggle } from "../components/layout/ThemeToggle";
 import { BudgetCatMascot } from "../components/mascot/BudgetCatMascot";
@@ -77,6 +78,7 @@ function TrustItem({
 }
 
 export function Login() {
+  const location = useLocation();
   const {
     authError,
     authMessage,
@@ -89,7 +91,8 @@ export function Login() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [localMessage, setLocalMessage] = useState<string | null>(null);
 
-  const authNotice = authError ?? authMessage ?? localMessage;
+  const authNotice = authError ?? authMessage ?? localMessage ??
+    (location.state?.passwordReset ? "Password updated successfully. You can now sign in." : null);
   const isSignupSuccess = Boolean(
     authMessage &&
       !authError &&
@@ -313,6 +316,11 @@ export function Login() {
               )}
 
               <form className="space-y-4" onSubmit={handleSubmit}>
+                {mode === "login" && (
+                  <Link className="inline-flex min-h-11 items-center text-sm font-bold text-[var(--bc-green)]" to="/forgot-password">
+                    Forgot Password?
+                  </Link>
+                )}
                 <label className="block space-y-2">
                   <span className="text-xs font-black text-[var(--bc-text-soft)]">
                     Email
