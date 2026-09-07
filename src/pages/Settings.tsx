@@ -474,6 +474,7 @@ export function Settings() {
             </button>
 
             <button
+              aria-label="Log out"
               className="bc-button bc-button-danger px-4"
               onClick={signOut}
               type="button"

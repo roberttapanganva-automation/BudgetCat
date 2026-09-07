@@ -386,10 +386,10 @@ const heroMascotVariant: MascotVariant =
 
 const heroMascotFrameClass =
   heroMascotVariant === "achieved"
-    ? "h-[126px] w-[126px]"
+    ? "h-24 w-24 sm:h-[126px] sm:w-[126px]"
     : heroMascotVariant === "savings"
-      ? "h-[122px] w-[122px]"
-      : "h-[106px] w-[106px]";
+      ? "h-24 w-24 sm:h-[122px] sm:w-[122px]"
+      : "h-24 w-24 sm:h-[106px] sm:w-[106px]";
 
 const heroMascotScaleClass =
   heroMascotVariant === "achieved"
@@ -445,12 +445,12 @@ const heroMascotScaleClass =
             />
 
             <div className="min-w-0 flex-1 self-center">
-              <div className="flex items-start justify-between gap-2">
+              <div className="flex flex-wrap items-start justify-between gap-2">
                 <div className="min-w-0">
                   <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[var(--bc-text-muted)]">
                     Featured goal
                   </p>
-                  <h2 className="mt-1 truncate text-lg font-black tracking-[-0.04em] text-[var(--bc-text)]">
+                  <h2 className="mt-1 break-words text-lg font-black leading-snug tracking-[-0.04em] text-[var(--bc-text)]">
                     {featuredGoal ? featuredGoal.title : "Start your first goal"}
                   </h2>
                 </div>

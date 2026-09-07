@@ -330,7 +330,7 @@ export function Login() {
                     <Mail className="pointer-events-none absolute left-4 top-1/2 h-4.5 w-4.5 -translate-y-1/2 text-[var(--bc-text-muted)]" />
                     <input
                       autoComplete="email"
-                      className="bc-input min-h-[54px] pl-14"
+                      className="bc-input min-h-[54px] !pl-14"
                       name="email"
                       placeholder="you@example.com"
                       required
@@ -350,7 +350,7 @@ export function Login() {
                       autoComplete={
                         mode === "signup" ? "new-password" : "current-password"
                       }
-                      className="bc-input min-h-[54px] pl-14"
+                      className="bc-input min-h-[54px] !pl-14"
                       minLength={6}
                       name="password"
                       placeholder="••••••••"

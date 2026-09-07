@@ -931,11 +931,11 @@ export function Transactions() {
             </div>
           </div>
 
-          <div className="mt-5 grid grid-cols-3 gap-3">
+          <div className="mt-5 grid grid-cols-3 gap-2 sm:gap-3">
               <div className="rounded-2xl border border-[var(--bc-green)]/20 bg-[var(--bc-green-glow)] p-3 sm:p-4">
-                <div className="flex items-center gap-1.5 text-[var(--bc-green)]">
+                <div className="flex flex-col items-start gap-1.5 text-[var(--bc-green)] sm:flex-row sm:items-center">
                   <ArrowUpCircle className="h-4 w-4 shrink-0" />
-                  <p className="text-[10px] font-black uppercase tracking-[0.12em] text-[var(--bc-text-muted)]">Income</p>
+                  <p className="whitespace-nowrap text-[11px] font-black tracking-normal text-[var(--bc-text-muted)] sm:uppercase sm:tracking-[0.12em]">Income</p>
                 </div>
 
                 <p className="mt-1 truncate text-sm font-black text-[var(--bc-green)]">
@@ -949,9 +949,9 @@ export function Transactions() {
               </div>
 
               <div className="rounded-2xl border border-[var(--bc-red)]/20 bg-[var(--bc-red-glow)] p-3 sm:p-4">
-                <div className="flex items-center gap-1.5 text-[var(--bc-red)]">
+                <div className="flex flex-col items-start gap-1.5 text-[var(--bc-red)] sm:flex-row sm:items-center">
                   <TrendingDown className="h-4 w-4 shrink-0" />
-                  <p className="text-[10px] font-black uppercase tracking-[0.12em] text-[var(--bc-text-muted)]">Expenses</p>
+                  <p className="whitespace-nowrap text-[11px] font-black tracking-normal text-[var(--bc-text-muted)] sm:uppercase sm:tracking-[0.12em]">Expenses</p>
                 </div>
 
                 <p className="mt-1 truncate text-sm font-black text-[var(--bc-red)]">
@@ -965,9 +965,9 @@ export function Transactions() {
               </div>
 
               <div className="rounded-2xl border border-[var(--bc-blue)]/20 bg-[var(--bc-blue)]/10 p-3 sm:p-4">
-                <div className="flex items-center gap-1.5 text-[var(--bc-blue)]">
+                <div className="flex flex-col items-start gap-1.5 text-[var(--bc-blue)] sm:flex-row sm:items-center">
                   <PiggyBank className="h-4 w-4 shrink-0" />
-                  <p className="text-[10px] font-black uppercase tracking-[0.12em] text-[var(--bc-text-muted)]">Savings</p>
+                  <p className="whitespace-nowrap text-[11px] font-black tracking-normal text-[var(--bc-text-muted)] sm:uppercase sm:tracking-[0.12em]">Savings</p>
                 </div>
 
                 <p className="mt-1 truncate text-sm font-black text-[var(--bc-blue)]">

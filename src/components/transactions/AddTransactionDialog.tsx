@@ -400,17 +400,19 @@ export function AddTransactionDialog({
                         return (
                           <button
                             className={[
-                              "min-h-10 rounded-2xl border px-2 py-2 text-[11px] font-black leading-tight transition max-[360px]:px-1 max-[360px]:text-[9px] sm:text-xs",
+                              "min-h-11 min-w-0 rounded-2xl border px-1 py-2 text-[11px] font-black leading-tight transition sm:px-2 sm:text-xs",
                               getSegmentToneClasses(
                                 transactionType.tone,
                                 isActive,
                               ),
                             ].join(" ")}
                             key={transactionType.value}
+                            aria-label={transactionType.label}
+                            aria-pressed={isActive}
                             onClick={() => setType(transactionType.value)}
                             type="button"
                           >
-                            {transactionType.label}
+                            {transactionType.value === "income" ? <>Income/<wbr />Salary</> : transactionType.label}
                           </button>
                         );
                       })}
@@ -446,14 +448,14 @@ export function AddTransactionDialog({
                     </section>
 
                     <div className="space-y-3">
-                      <div className="grid grid-cols-2 gap-3 max-[360px]:gap-2">
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                         <label className="min-w-0 space-y-1.5">
                           <span className="text-xs font-black text-[var(--bc-text)]">
                             Type
                           </span>
 
                           <select
-                            className="budget-input min-h-11 w-full min-w-0 py-2.5 text-sm max-[360px]:text-[11px]"
+                            className="budget-input min-h-11 w-full min-w-0 py-2.5"
                             onChange={(event) =>
                               setType(event.target.value as TransactionType)
                             }
@@ -477,7 +479,7 @@ export function AddTransactionDialog({
                           </span>
 
                           <select
-                            className="budget-input min-h-11 w-full min-w-0 py-2.5 text-sm max-[360px]:text-[11px]"
+                            className="budget-input min-h-11 w-full min-w-0 py-2.5"
                             onChange={(event) => setCategory(event.target.value)}
                             value={category}
                           >
@@ -514,14 +516,14 @@ export function AddTransactionDialog({
                         />
                       </label>
 
-                      <div className="grid grid-cols-2 gap-3 max-[360px]:gap-2">
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                         <label className="min-w-0 space-y-1.5">
                           <span className="text-xs font-black text-[var(--bc-text)]">
                             Date
                           </span>
 
                           <input
-                            className="budget-input min-h-11 w-full min-w-0 py-2.5 text-sm max-[360px]:text-[11px]"
+                            className="budget-input min-h-11 w-full min-w-0 py-2.5"
                             onChange={(event) => setDate(event.target.value)}
                             type="date"
                             value={date}
@@ -534,7 +536,7 @@ export function AddTransactionDialog({
                           </span>
 
                           <select
-                            className="budget-input min-h-11 w-full min-w-0 py-2.5 text-sm max-[360px]:text-[11px]"
+                            className="budget-input min-h-11 w-full min-w-0 py-2.5"
                             onChange={(event) => setPaymentMethod(event.target.value)}
                             value={paymentMethod}
                           >

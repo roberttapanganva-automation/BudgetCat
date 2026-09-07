@@ -1100,7 +1100,7 @@ export function Reports() {
             </ResponsiveContainer>
           </div>
 
-          <div className="mt-4 grid grid-cols-4 gap-2">
+          <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
             {[
               ["Income", "var(--bc-green)"],
               ["Expenses", "var(--bc-red)"],

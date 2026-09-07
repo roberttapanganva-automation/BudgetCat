@@ -447,7 +447,7 @@ svg {
     border-radius: 15px;
     border: 1px solid transparent;
     padding: 0.75rem 1rem;
-    font-size: 0.88rem;
+    font-size: 1rem;
     font-weight: 800;
     line-height: 1;
     transition:
@@ -1157,7 +1157,7 @@ svg {
 
   .bc-input,
   .budget-input {
-    font-size: 0.84rem;
+    font-size: 1rem;
   }
 
   .bc-fab {
@@ -1178,6 +1178,16 @@ svg {
     font-size: 8.75px;
   }
 }
+/* Standard mobile controls; large amount inputs use their own typography. */
+@media (max-width: 767px) {
+  .bc-input,
+  .budget-input {
+    font-size: 16px;
+    min-width: 0;
+    max-width: 100%;
+  }
+}
+
 /* BudgetCat date picker icon polish */
 @layer base {
   input[type="date"],

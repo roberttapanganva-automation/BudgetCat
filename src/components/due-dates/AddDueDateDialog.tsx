@@ -115,7 +115,7 @@ export function AddDueDateDialog({
             <input className="bc-input w-full min-w-0" name="title" placeholder="Bill title" required />
           </label>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <label className="grid min-w-0 gap-2 text-xs font-black text-[var(--bc-text-soft)]">
               Amount
               <input
